@@ -1,0 +1,58 @@
+{
+  "summary": "Full backend + frontend E2E testing of the B2B marketplace (TradeHub). Backend: 51 pytest cases across auth, RBAC/security, catalog, tier pricing/cart, COD + Razorpay checkout with server-side recompute, RFQ/quotations, admin CRUD (products/categories/brands/settings/orders/vendors), vendor scoping — 51/51 passing. Frontend: verified homepage (hero, announcement bar, mega-menu with subcategories + right-side promo image, category grid, featured products, RFQ CTA, footer), search->/products?q=, product listing filters/sort, PDP tier pricing + MOQ enforcement + qty stepper + price recompute, unauth guards, buyer login->add to cart->cart totals->COD checkout->order in /account, RFQ creation, Razorpay checkout modal open with correct amount (payment not completed), admin dashboard KPIs + product/category/brand creation + order status update + Shiprocket ship + vendor approve/suspend + settings live theme change persisted to storefront, vendor dashboard/products/orders, RBAC redirects for buyer/vendor, registration + invalid-login error, mobile drawer. 5 issues found (1 high: vendor product page not scoped to vendor).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders/checkout", "issue": "Address is accepted with all-empty strings (fullName/phone/line1/city/state/pincode = \"\") and the order is created (verified via curl, 200). No min_length / pincode / phone validation on AddressIn, and no client-side required-field validation in Checkout.jsx."},
+      {"endpoint": "POST /api/orders/checkout (razorpay)", "issue": "Cart is cleared and product stock decremented BEFORE payment for paymentMethod=razorpay (status pending_payment). Abandoning the Razorpay modal loses the cart and permanently reduces stock; no reservation/rollback."},
+      {"endpoint": "POST /api/products", "issue": "Accepts categoryId=\"\" (empty string) and price 0 — orphan product appears in storefront catalog. Add non-empty categoryId + price>0 validation."},
+      {"endpoint": "POST /api/orders/checkout", "issue": "orderNo = prefix + int(time.time()) (second precision) with a unique index on orderNo. Two checkouts inside the same second by different users would raise DuplicateKeyError -> 500. Rapid sequential test passed but the race remains; use a counter/uuid suffix."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "vendor/Products.jsx (reuses admin/Products)", "issue": "HIGH: Vendor 'My Products' lists ALL products via GET /products?limit=100 (unscoped) including products of other vendors / admin-owned products, and renders a Delete button for each. Backend rejects the delete with 403 but the UI shows the action and leaks other sellers' catalog. Should call /products?vendor=<my vendor id>.", "selector": "[data-testid^='admin-product-']", "priority": "HIGH"},
+      {"component": "StoreLayout header (cart badge)", "issue": "Cart badge is not refreshed after a successful checkout (store.useCart has no clear/refetch); header keeps showing the pre-order item count until a full page reload.", "selector": "[data-testid='cart-link']", "priority": "MEDIUM"},
+      {"component": "Checkout.jsx", "issue": "Coupon input has no Apply button and the applied discount is never shown in the summary (discount only applied silently server-side at checkout). Also no required-field validation before Place Order.", "selector": "[data-testid='coupon-input']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Global currency formatting", "issues": ["Totals render as ₹25,948.2 / ₹3,958.2 (one decimal) instead of ₹25,948.20 — use toLocaleString with minimumFractionDigits: 2"]},
+      {"screen": "Product detail", "issues": ["MRP is duplicated: struck-through ₹2799 immediately followed by an orange 'MRP ₹2799' pill", "Bosch drill product image shows a Milwaukee drill (seed image mismatch with product name)"]},
+      {"screen": "Mega-menu panel", "issues": ["Fixed 720px panel with 2-column subcategory grid leaves a large empty block when a category has only 2 subcategories"]},
+      {"screen": "Mobile (390px)", "issues": ["Search bar is hidden below md breakpoint with no alternative search entry point in the drawer/header"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/backend/tests/cleanup_qa_data.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Scope vendor product list to the logged-in vendor (create a VendorProducts page or pass a vendorId filter) instead of reusing AdminProducts unfiltered",
+    "Do not clear the cart / decrement stock for razorpay orders until payment is verified (or restore on failure/abandon)",
+    "Add address validation (min_length, 6-digit pincode, 10-digit phone) on AddressIn and required-field checks in Checkout.jsx",
+    "Validate categoryId non-empty and price > 0 on POST /api/products (and in the admin product modal)",
+    "Refresh/clear the cart store after successful checkout so the header badge is accurate",
+    "Make orderNo collision-proof (counter or uuid suffix) since orderNo has a unique index",
+    "Show applied coupon discount in cart/checkout summary and add an Apply action"
+  ],
+  "critical_code_review_comments": [
+    "vendor/Products.jsx and vendor/Orders.jsx are thin re-exports of the admin pages; the admin product page is inherently unscoped, so vendor role sees global catalog — needs its own scoped data source",
+    "checkout() mutates stock and clears the cart before payment confirmation; move these side effects into verify-payment / webhook for prepaid orders",
+    "orderNo generated from int(time.time()) combined with a unique index is a latent 500 under concurrency",
+    "AddressIn / ProductIn accept empty strings for business-critical fields (pincode, categoryId); tighten Pydantic constraints"
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/cleanup_qa_data.py",
+    "/app/frontend/src/pages/Products.jsx (added data-testid filter-brand-<slug>)",
+    "/app/frontend/src/pages/admin/Products.jsx (added data-testid prod-price/mrp/stock/moq/gst, prod-brand)",
+    "/app/frontend/src/pages/admin/Orders.jsx (added data-testid status-<orderNo>)",
+    "/app/frontend/src/pages/admin/Vendors.jsx (added data-testid suspend-<id>)",
+    "/app/frontend/src/pages/Register.jsx (moved reg-role-* testid to the clickable label; hidden radio is now reg-role-*-input)"
+  ],
+  "success_rate": {"backend": "100% (51/51 pytest)", "frontend": "~90% (all core flows pass; 1 high scoping bug + 2 medium UI gaps)"},
+  "seed_data_creation": "Used seeded admin/vendor/buyer accounts. Created and deleted QA products/category/brand via API cleanup script; several TEST_/QA orders, RFQs, quotations and registered users (TEST_*, qa_reg_*) remain in the DB from test runs (harmless, prefixed).",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin@tradehub.com/admin123, vendor@tradehub.com/vendor123, buyer@tradehub.com/buyer123 (from /app/memory/test_credentials.md) — all valid",
+  "context_for_next_testing_agent": "Backend regression suite: /app/backend/tests/backend_test.py (51 tests, run with configured pytest.ini; TestCheckout uses a freshly registered buyer to avoid cart races across xdist workers). Cleanup helper: /app/backend/tests/cleanup_qa_data.py removes QA_/TEST_ products, categories, brands and restores theme primary #0052ff — run it after UI tests. Product routes are /products/:slug (e.g. bosch-drill-450w); category filter testids use slugs (filter-cat-textiles), backend ids are c-*. Razorpay live key opens a real checkout modal — never complete payment. Shiprocket ship succeeds and sets status shipped. Not yet tested: coupon end-to-end at checkout, media upload endpoint, razorpay webhook, reviews UI, quotation accept flow, pagination on /products.",
+  "rca_of_the_issue": "Vendor product leak: /app/frontend/src/pages/vendor/Products.jsx simply re-exports admin/Products, whose load() calls GET /products?limit=100 with no vendor filter, so any vendor sees the whole catalog with delete affordances (server-side 403 is the only protection). Razorpay stock/cart issue: server.py checkout() performs stock decrement and cart clear unconditionally after inserting the order, before payment verification."
+}

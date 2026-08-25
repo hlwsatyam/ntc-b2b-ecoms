@@ -1,0 +1,138 @@
+{
+  "theme": "Light",
+  "design_philosophy": "Vibrant B2B Marketplace. High trust, precision, workflow-centric but visually energetic. No AI-slop purple. Focus on 'Swiss & High-Contrast' archetype mixed with vibrant accents.",
+  "typography": {
+    "headings": {
+      "family": "Cabinet Grotesk, sans-serif",
+      "weights": ["700", "800", "900"],
+      "tracking": "tracking-tight",
+      "usage": "Use for all marketing headings, storefront heroes, and primary page titles."
+    },
+    "body": {
+      "family": "Satoshi, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Clean, readable body text for product descriptions, reviews, and general UI."
+    },
+    "data_sku": {
+      "family": "JetBrains Mono, monospace",
+      "weights": ["400", "600"],
+      "usage": "Use for SKUs, order IDs, pricing tables, dimensions, and technical specs."
+    }
+  },
+  "colors": {
+    "css_variables_instruction": "Provide color tokens as CSS variables so admin theme editor can override them without code changes.",
+    "primary": {
+      "hex": "#0052FF",
+      "name": "Electric Azure",
+      "usage": "Primary CTAs, active states, key highlights. High energy, trust-building."
+    },
+    "secondary": {
+      "hex": "#0A0F2C",
+      "name": "Deep Indigo",
+      "usage": "Headers, footers, typography, high-contrast dark backgrounds."
+    },
+    "accent": {
+      "hex": "#FF5A00",
+      "name": "Vibrant Blaze",
+      "usage": "Flash sales, deals, notification dots, urgent actions."
+    },
+    "background": {
+      "hex": "#F8FAFC",
+      "name": "Cool Slate",
+      "usage": "Main app background. Never pure white for the whole page."
+    },
+    "surface": {
+      "hex": "#FFFFFF",
+      "name": "Pure White",
+      "usage": "Cards, dropdowns, sticky headers."
+    },
+    "border": {
+      "hex": "#E2E8F0",
+      "name": "Crisp Border",
+      "usage": "1px structural dividers. Use heavily for grid borders and bento layouts."
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing, Mobile-First. Structural bento grids for marketing, dense high-utility grids for dashboards.",
+    "storefront_hero": "Bento Grid: grid-cols-1 md:grid-cols-12 gap-6. Hero banner spans 8 cols, side promos span 4.",
+    "product_grid": "Dense bento. grid-cols-2 md:grid-cols-4 lg:grid-cols-5. 1px solid borders, no shadows.",
+    "dashboards": "Strict 12-column grid. High density, compact spacing (gap-4). Cardless approach: use sharp 1px borders instead of drop shadows."
+  },
+  "ui_components": {
+    "header_mega_menu": "White/Glassmorphic header. Mega-menu opens on hover with 3-column layout for categories/subcategories and 1-column on right for promo image.",
+    "buttons": "Sharp corners or slight radius (rounded-md). High contrast text. Use solid Primary for 'Add to Cart' or 'Request Quote'.",
+    "cards": "Flat, sharp edges, 1px border. No soft shadows. Use hover translateY(-2px) and border color change.",
+    "badges": "Pill-shaped, bold colors (e.g., Yellow for MOQ, Red for Flash Sale, Blue for Verified Vendor).",
+    "tables": "Zebra striping or distinct 1px border bottom. Use Shadcn Table. Align numerical data right, text left."
+  },
+  "marketplace_specifics": {
+    "product_listing": "Filters on left (collapsible on mobile). Infinite scroll or pagination. Product cards must show: Image, Vendor name, Title, Tiered price (e.g., $10-$15), MOQ, Rating.",
+    "product_detail_page": "Split layout. Left: Image gallery + Sticky thumbnail column. Right: Title, Vendor Trust Badge, Tier Pricing Table (Buy more, save more), MOQ selector, RFQ button, Add to Cart. Bottom: Tabs for Specs, Vendor Info, Reviews.",
+    "vendor_dashboard": "KPI cards at top. Sidebar navigation. High-density data tables for Orders, Inventory, RFQs.",
+    "admin_theme_editor": "Sidebar with color pickers (Primary, Secondary, Background), logo upload, font selector. Main content area previews the changes in real-time."
+  },
+  "image_urls": {
+    "hero_banners": [
+      {
+        "url": "https://images.pexels.com/photos/36398150/pexels-photo-36398150.jpeg",
+        "description": "Logistics and warehouse hero banner"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1496247749665-49cf5b1022e9",
+        "description": "Industrial factory hero banner"
+      }
+    ],
+    "category_promos": [
+      {
+        "url": "https://images.pexels.com/photos/18631424/pexels-photo-18631424.jpeg",
+        "description": "Automated conveyor/production line for category promo in mega-menu"
+      }
+    ],
+    "vendor_avatars": [
+      {
+        "url": "https://images.pexels.com/photos/38453564/pexels-photo-38453564.jpeg",
+        "description": "Professional vendor / company profile portrait"
+      }
+    ]
+  },
+  "motion": {
+    "philosophy": "Functional motion. Not distracting.",
+    "hover_states": "Quick transitions (duration-200 ease-out) on buttons and cards.",
+    "page_transitions": "Subtle fade-in for product listings and dashboards."
+  },
+  "accessibility": {
+    "contrast": "Ensure pure hex primary colors pass APCA contrast with their text.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='add-to-cart-btn').",
+    "focus": "High visibility focus rings (focus:ring-2 focus:ring-primary focus:ring-offset-2) on all form elements and buttons."
+  },
+  "visual_enhancers": {
+    "icons": "Use Phosphor Icons (@phosphor-icons/react) for a premium B2B look (duotone weight).",
+    "borders": "Use the 'Grid Borders' style for feature sections and footer: exposing the grid skeleton.",
+    "glassmorphism": "Use sparingly, only for sticky header: backdrop-blur-xl bg-white/80 border-b border-gray-200. Never use pure transparent backgrounds."
+  },
+  "instructions_to_main_agent": [
+    "Prioritize implementing CSS variables for the color palette in index.css so the Admin Theme Editor can easily modify them at runtime.",
+    "For the Storefront, build custom HTML/Tailwind layouts for high-impact visual sections (Hero, Featured Categories).",
+    "For Dashboards and Forms, rely heavily on customized Shadcn UI components.",
+    "Ensure all data tables (Orders, Customers, Vendors) in the admin and vendor panels handle large datasets visually by using compact row heights and monospace fonts for IDs.",
+    "Use Phosphor icons. Command: yarn add @phosphor-icons/react",
+    "Use Sonner for toast notifications (e.g., 'Added to cart', 'RFQ Sent').",
+    "Do NOT use HTML <select> or <input type='date'>. Use Shadcn Select and Calendar components.",
+    "Never use pure transparent backgrounds for headers or overlays. Always use a blur or semi-solid background."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, i.e., do not add .App { text-align: center; }.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc. for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Examine existing components to understand the project's component patterns before creating new ones.",
+    "Use `sonner` for toasts. Located in /app/src/components/ui/sonner.tsx"
+  ]
+}

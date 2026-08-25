@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800,900&f[]=satoshi@400,500,700,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+    /* Brand tokens (overrideable from admin theme editor) */
+    --brand-primary: #0052FF;
+    --brand-secondary: #0A0F2C;
+    --brand-accent: #FF5A00;
+    --brand-bg: #F8FAFC;
+    --brand-surface: #FFFFFF;
+    --brand-border: #E2E8F0;
+    --brand-radius: 0.5rem;
+
+    /* Shadcn tokens mapped from brand */
+    --background: 210 40% 98%;
+    --foreground: 232 63% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 232 63% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 232 63% 11%;
+    --primary: 220 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 232 63% 11%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 20 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 220 100% 50%;
+    --radius: 0.5rem;
+}
+
+html, body, #root {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: 'Satoshi', system-ui, sans-serif;
+    background: var(--brand-bg);
+    color: var(--brand-secondary);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Cabinet Grotesk', 'Satoshi', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.font-mono, code, .sku {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+    * { @apply border-border; }
+}
+
+/* Utility */
+.container-max { max-width: 1400px; margin-inline: auto; padding-inline: 1rem; }
+@media (min-width: 1024px) { .container-max { padding-inline: 2rem; } }
+
+.grid-borders > * + * { border-left: 1px solid var(--brand-border); }
+.card-flat { background: var(--brand-surface); border: 1px solid var(--brand-border); border-radius: var(--brand-radius); transition: border-color .2s ease, transform .2s ease; }
+.card-flat:hover { border-color: var(--brand-primary); transform: translateY(-2px); }
+
+.btn-primary {
+    background: var(--brand-primary); color: #fff;
+    padding: .625rem 1.25rem; border-radius: var(--brand-radius);
+    font-weight: 600; transition: filter .15s ease, transform .15s ease;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { transform: translateY(1px); }
+
+.btn-ghost {
+    background: transparent; color: var(--brand-secondary);
+    border: 1px solid var(--brand-border); padding: .5rem 1rem;
+    border-radius: var(--brand-radius); font-weight: 500;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+.btn-ghost:hover { background: var(--brand-bg); border-color: var(--brand-primary); }
+
+.pill { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .625rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+.pill-blue { background: rgba(0,82,255,.08); color: var(--brand-primary); }
+.pill-orange { background: rgba(255,90,0,.1); color: var(--brand-accent); }
+.pill-emerald { background: rgba(16,185,129,.1); color: #059669; }
+.pill-yellow { background: rgba(250,204,21,.15); color: #b45309; }
+
+.mega-shadow { box-shadow: 0 20px 60px -20px rgba(10,15,44,0.25); }
+
+.grain::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(10,15,44,.06) 1px, transparent 1px);
+    background-size: 4px 4px; mix-blend-mode: multiply;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-primary); }
+
+/* Emergent debug wrapper */
+[data-debug-wrapper="true"] { display: contents !important; }
