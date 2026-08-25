@@ -1,11 +1,12 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../store";
-import { House, Package, ShoppingBag } from "@phosphor-icons/react";
+import { House, Package, ShoppingBag, Wallet } from "@phosphor-icons/react";
 
 const items = [
   { to: "/vendor", label: "Dashboard", icon: House, end: true, testid: "vendor-nav-dashboard" },
   { to: "/vendor/products", label: "My Products", icon: Package, testid: "vendor-nav-products" },
   { to: "/vendor/orders", label: "Orders", icon: ShoppingBag, testid: "vendor-nav-orders" },
+  { to: "/vendor/wallet", label: "Wallet", icon: Wallet, testid: "vendor-nav-wallet" },
 ];
 
 export default function VendorLayout() {

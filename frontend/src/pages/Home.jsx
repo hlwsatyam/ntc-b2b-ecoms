@@ -9,13 +9,16 @@ export default function Home() {
   const { settings } = useSettings();
   const [featured, setFeatured] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [flash, setFlash] = useState([]);
 
   useEffect(() => {
     api.get("/products?featured=true&limit=10").then((r) => setFeatured(r.data.items || []));
     api.get("/categories").then((r) => setCategories((r.data || []).filter((c) => !c.parentId).slice(0, 4)));
+    api.get("/flash-sales?activeOnly=true").then((r) => setFlash(r.data || [])).catch(() => {});
   }, []);
 
   const banner = settings?.homepage?.heroBanners?.[0];
+  const activeFlash = flash[0];
 
   return (
     <div>
@@ -55,6 +58,16 @@ export default function Home() {
 
       {/* Categories */}
       <section className="container-max py-8">
+        {activeFlash && (
+          <Link to="/products" className="mb-6 flex items-center gap-3 p-4 rounded-lg text-white overflow-hidden relative" style={{ background: "linear-gradient(90deg, var(--brand-accent), var(--brand-secondary))" }} data-testid="flash-sale-banner">
+            <Lightning size={28} weight="fill" className="animate-pulse" />
+            <div className="flex-1">
+              <div className="font-display font-black text-xl">{activeFlash.name} — {activeFlash.discountPct}% OFF</div>
+              <div className="text-xs opacity-90">Ends {new Date(activeFlash.endsAt).toLocaleString()}</div>
+            </div>
+            <span className="btn-ghost bg-white/10 border-white/30 text-white text-xs">Shop now →</span>
+          </Link>
+        )}
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="text-2xl md:text-3xl font-black">Shop by category</h2>
           <Link to="/products" className="text-sm font-semibold text-[color:var(--brand-primary)]">View all →</Link>

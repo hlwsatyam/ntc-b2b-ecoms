@@ -659,10 +659,38 @@ async def update_order_status(oid: str, data: dict, user: dict = Depends(get_cur
     status = data.get("status")
     if not status:
         raise HTTPException(400, "status required")
+    order = await db.orders.find_one({"id": oid})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    prev = order.get("status")
     await db.orders.update_one({"id": oid}, {
         "$set": {"status": status},
         "$push": {"timeline": {"status": status, "at": now(), "by": user["id"]}},
     })
+    # On first transition to delivered → credit vendor wallets with commission deducted
+    if status == "delivered" and prev != "delivered":
+        by_vendor = {}
+        for it in order.get("items", []):
+            vid = it.get("vendorId")
+            if not vid:
+                continue
+            by_vendor.setdefault(vid, 0.0)
+            by_vendor[vid] += float(it.get("lineTotal", 0))
+        for vid, gross in by_vendor.items():
+            v = await db.vendors.find_one({"id": vid})
+            if not v:
+                continue
+            pct = float(v.get("commissionPct", 10))
+            commission = round(gross * pct / 100, 2)
+            net = round(gross - commission, 2)
+            await db.vendors.update_one({"id": vid}, {"$inc": {"walletBalance": net}})
+            await db.wallet_transactions.insert_one({
+                "id": new_id(), "vendorId": vid, "orderId": oid, "orderNo": order.get("orderNo"),
+                "type": "credit", "gross": gross, "commissionPct": pct, "commission": commission,
+                "amount": net, "balance": (v.get("walletBalance", 0) + net),
+                "status": "available", "note": f"Order {order.get('orderNo')} delivered",
+                "createdAt": now(),
+            })
     return clean(await db.orders.find_one({"id": oid}))
 
 
@@ -871,6 +899,249 @@ async def razorpay_webhook(request: Request):
     payment = event.get("payload", {}).get("payment", {}).get("entity", {})
     if kind == "payment.captured" and payment.get("order_id"):
         await db.orders.update_one({"razorpayOrderId": payment["order_id"]}, {"$set": {"paymentStatus": "paid", "status": "confirmed"}})
+    return {"ok": True}
+
+
+# ============ BULK IMPORT / WALLET / PAYOUTS / FLASH SALES ============
+import csv as _csv
+from io import BytesIO, StringIO
+from openpyxl import load_workbook
+
+REQUIRED_COLS = ["name", "categoryId", "price", "mrp", "stock", "moq", "gst"]
+OPTIONAL_COLS = ["sku", "brandId", "description", "hsn", "images", "isActive", "isFeatured"]
+
+
+def _parse_rows(filename: str, content: bytes) -> list:
+    name = (filename or "").lower()
+    if name.endswith(".csv"):
+        text = content.decode("utf-8-sig", errors="replace")
+        reader = _csv.DictReader(StringIO(text))
+        return [dict(r) for r in reader]
+    if name.endswith((".xlsx", ".xls")):
+        wb = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        headers = [str(h).strip() if h is not None else "" for h in next(rows_iter, [])]
+        out = []
+        for row in rows_iter:
+            if all(v is None or v == "" for v in row):
+                continue
+            out.append({headers[i]: row[i] for i in range(min(len(headers), len(row)))})
+        return out
+    raise HTTPException(400, "Unsupported file. Use .csv or .xlsx")
+
+
+async def _validate_import(rows: list) -> dict:
+    cats = {c["id"] for c in await db.categories.find({}, {"id": 1}).to_list(1000)}
+    brands = {b["id"] for b in await db.brands.find({}, {"id": 1}).to_list(1000)}
+    valid, errors = [], []
+    seen_skus = set()
+    for idx, r in enumerate(rows, start=2):  # header is row 1
+        row_err = []
+        for col in REQUIRED_COLS:
+            if r.get(col) in (None, ""):
+                row_err.append(f"{col} required")
+        try:
+            price = float(r.get("price") or 0)
+            mrp = float(r.get("mrp") or price)
+            stock = int(float(r.get("stock") or 0))
+            moq = int(float(r.get("moq") or 1))
+            gst = float(r.get("gst") or 18)
+            if price <= 0:
+                row_err.append("price must be > 0")
+        except Exception:
+            row_err.append("price/mrp/stock/moq/gst must be numeric")
+            price = mrp = 0; stock = moq = 0; gst = 18
+        cat = str(r.get("categoryId") or "").strip()
+        if cat and cat not in cats:
+            row_err.append(f"unknown categoryId '{cat}'")
+        brand = str(r.get("brandId") or "").strip()
+        if brand and brand not in brands:
+            row_err.append(f"unknown brandId '{brand}'")
+        sku = str(r.get("sku") or "").strip()
+        if sku:
+            if sku in seen_skus:
+                row_err.append(f"duplicate SKU in file: {sku}")
+            else:
+                seen_skus.add(sku)
+        item = {
+            "row": idx,
+            "data": {
+                "name": str(r.get("name") or "").strip(),
+                "sku": sku or None,
+                "categoryId": cat,
+                "brandId": brand or None,
+                "description": str(r.get("description") or ""),
+                "hsn": str(r.get("hsn") or ""),
+                "price": price, "mrp": mrp if mrp else price,
+                "stock": stock, "moq": moq, "gst": gst,
+                "images": [i.strip() for i in str(r.get("images") or "").split("|") if i.strip()],
+                "isActive": str(r.get("isActive") or "true").lower() in ("1", "true", "yes"),
+                "isFeatured": str(r.get("isFeatured") or "false").lower() in ("1", "true", "yes"),
+            },
+            "errors": row_err,
+        }
+        (errors if row_err else valid).append(item)
+    return {"valid": valid, "errors": errors, "total": len(rows)}
+
+
+@api.get("/products/import/template")
+async def import_template():
+    header = REQUIRED_COLS + OPTIONAL_COLS
+    sample = ["Sample Widget", "c-electronics", "199", "249", "100", "10", "18",
+              "SKU-SAMPLE-01", "b-1", "Sample description", "8471", "https://example.com/img.jpg|https://example.com/img2.jpg", "true", "false"]
+    body = ",".join(header) + "\n" + ",".join(sample) + "\n"
+    from fastapi.responses import Response
+    return Response(content=body, media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=product-import-template.csv"})
+
+
+@api.post("/products/import/preview")
+async def import_preview(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if user["role"] not in ("super_admin", "admin", "vendor"):
+        raise HTTPException(403, "Not allowed")
+    content = await file.read()
+    rows = _parse_rows(file.filename or "", content)
+    return await _validate_import(rows)
+
+
+@api.post("/products/import/commit")
+async def import_commit(payload: dict, user: dict = Depends(get_current_user)):
+    if user["role"] not in ("super_admin", "admin", "vendor"):
+        raise HTTPException(403, "Not allowed")
+    items = payload.get("items") or []
+    vendor_id = None
+    if user["role"] == "vendor":
+        v = await db.vendors.find_one({"userId": user["id"]})
+        vendor_id = v["id"] if v else None
+    inserted = 0
+    failed = []
+    for it in items:
+        d = it["data"] if "data" in it else it
+        try:
+            d["id"] = new_id()
+            d["slug"] = slugify(d["name"]) + "-" + d["id"][:6]
+            d["sku"] = d.get("sku") or f"SKU-{d['id'][:8].upper()}"
+            d["vendorId"] = vendor_id or d.get("vendorId")
+            d["createdAt"] = now()
+            d["soldCount"] = 0
+            d["tierPricing"] = d.get("tierPricing", [])
+            d["specifications"] = d.get("specifications", {})
+            d["lowStockThreshold"] = d.get("lowStockThreshold", 5)
+            await db.products.insert_one(d)
+            inserted += 1
+        except Exception as e:
+            failed.append({"row": it.get("row"), "error": str(e)})
+    return {"inserted": inserted, "failed": failed}
+
+
+# ---- Wallet ----
+@api.get("/wallet/vendor")
+async def vendor_wallet(user: dict = Depends(require_roles("vendor"))):
+    v = await db.vendors.find_one({"userId": user["id"]}, {"_id": 0})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    txns = clean_list(await db.wallet_transactions.find({"vendorId": v["id"]}).sort("createdAt", -1).to_list(500))
+    payouts = clean_list(await db.payouts.find({"vendorId": v["id"]}).sort("createdAt", -1).to_list(200))
+    return {"vendor": v, "transactions": txns, "payouts": payouts}
+
+
+class PayoutRequestIn(BaseModel):
+    amount: float
+    method: str = "bank_transfer"
+    notes: Optional[str] = ""
+
+
+@api.post("/payouts/request")
+async def request_payout(data: PayoutRequestIn, user: dict = Depends(require_roles("vendor"))):
+    v = await db.vendors.find_one({"userId": user["id"]})
+    if not v:
+        raise HTTPException(404, "Vendor not found")
+    bal = float(v.get("walletBalance", 0))
+    if data.amount <= 0 or data.amount > bal:
+        raise HTTPException(400, f"Invalid amount. Available balance: ₹{bal}")
+    p = {
+        "id": new_id(), "vendorId": v["id"], "vendorName": v["companyName"],
+        "amount": data.amount, "method": data.method, "notes": data.notes,
+        "status": "pending", "createdAt": now(),
+    }
+    await db.payouts.insert_one(p)
+    return clean(p)
+
+
+@api.get("/payouts")
+async def list_payouts(user: dict = Depends(get_current_user)):
+    if user["role"] in ("super_admin", "admin"):
+        docs = await db.payouts.find({}, {"_id": 0}).sort("createdAt", -1).to_list(500)
+    elif user["role"] == "vendor":
+        v = await db.vendors.find_one({"userId": user["id"]})
+        docs = await db.payouts.find({"vendorId": v["id"] if v else "_"}, {"_id": 0}).sort("createdAt", -1).to_list(500)
+    else:
+        raise HTTPException(403, "Not allowed")
+    return docs
+
+
+@api.put("/payouts/{pid}/status")
+async def update_payout(pid: str, data: dict, user: dict = Depends(require_permission("payments.manage"))):
+    status = data.get("status")
+    if status not in ("approved", "paid", "rejected"):
+        raise HTTPException(400, "invalid status")
+    p = await db.payouts.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Not found")
+    updates = {"status": status, "updatedAt": now()}
+    if status == "paid":
+        updates["paidAt"] = now()
+        # deduct from wallet + record txn
+        await db.vendors.update_one({"id": p["vendorId"]}, {"$inc": {"walletBalance": -float(p["amount"])}})
+        await db.wallet_transactions.insert_one({
+            "id": new_id(), "vendorId": p["vendorId"], "type": "debit",
+            "amount": -float(p["amount"]), "status": "paid",
+            "note": f"Payout {pid} paid via {p.get('method')}", "createdAt": now(),
+        })
+    await db.payouts.update_one({"id": pid}, {"$set": updates})
+    return clean(await db.payouts.find_one({"id": pid}))
+
+
+# ---- Flash Sales ----
+class FlashSaleIn(BaseModel):
+    name: str
+    discountPct: float = Field(gt=0, le=90)
+    productIds: List[str] = []
+    categoryId: Optional[str] = None
+    startsAt: str
+    endsAt: str
+    banner: Optional[str] = ""
+    isActive: bool = True
+
+
+@api.get("/flash-sales")
+async def list_flash_sales(activeOnly: bool = False):
+    q = {}
+    if activeOnly:
+        n = now()
+        q = {"isActive": True, "startsAt": {"$lte": n}, "endsAt": {"$gte": n}}
+    return clean_list(await db.flash_sales.find(q).sort("startsAt", -1).to_list(200))
+
+
+@api.post("/flash-sales")
+async def create_flash_sale(data: FlashSaleIn, user: dict = Depends(require_permission("coupons.manage"))):
+    d = data.model_dump()
+    d["id"] = new_id()
+    d["createdAt"] = now()
+    await db.flash_sales.insert_one(d)
+    return clean(d)
+
+
+@api.put("/flash-sales/{fid}")
+async def update_flash_sale(fid: str, data: dict, user: dict = Depends(require_permission("coupons.manage"))):
+    await db.flash_sales.update_one({"id": fid}, {"$set": data})
+    return clean(await db.flash_sales.find_one({"id": fid}))
+
+
+@api.delete("/flash-sales/{fid}")
+async def delete_flash_sale(fid: str, user: dict = Depends(require_permission("coupons.manage"))):
+    await db.flash_sales.delete_one({"id": fid})
     return {"ok": True}
 
 

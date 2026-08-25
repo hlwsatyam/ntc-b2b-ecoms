@@ -1,14 +1,17 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../store";
-import { House, Package, FolderOpen, Tag, ShoppingBag, Storefront, Gear } from "@phosphor-icons/react";
+import { House, Package, FolderOpen, Tag, ShoppingBag, Storefront, Gear, UploadSimple, Wallet, Lightning } from "@phosphor-icons/react";
 
 const items = [
   { to: "/admin", label: "Dashboard", icon: House, end: true, testid: "nav-dashboard" },
   { to: "/admin/products", label: "Products", icon: Package, testid: "nav-products" },
+  { to: "/admin/bulk-import", label: "Bulk Import", icon: UploadSimple, testid: "nav-bulk-import" },
   { to: "/admin/categories", label: "Categories", icon: FolderOpen, testid: "nav-categories" },
   { to: "/admin/brands", label: "Brands", icon: Tag, testid: "nav-brands" },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag, testid: "nav-orders" },
   { to: "/admin/vendors", label: "Vendors", icon: Storefront, testid: "nav-vendors" },
+  { to: "/admin/payouts", label: "Payouts", icon: Wallet, testid: "nav-payouts" },
+  { to: "/admin/flash-sales", label: "Flash Sales", icon: Lightning, testid: "nav-flashsales" },
   { to: "/admin/settings", label: "Settings", icon: Gear, testid: "nav-settings" },
 ];
 

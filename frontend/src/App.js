@@ -21,9 +21,13 @@ import AdminBrands from "./pages/admin/Brands";
 import AdminOrders from "./pages/admin/Orders";
 import AdminVendors from "./pages/admin/Vendors";
 import AdminSettings from "./pages/admin/Settings";
+import AdminBulkImport from "./pages/admin/BulkImport";
+import AdminPayouts from "./pages/admin/Payouts";
+import AdminFlashSales from "./pages/admin/FlashSales";
 import VendorDashboard from "./pages/vendor/Dashboard";
 import VendorProducts from "./pages/vendor/Products";
 import VendorOrders from "./pages/vendor/Orders";
+import VendorWallet from "./pages/vendor/Wallet";
 import "./index.css";
 
 function Protected({ roles, children }) {
@@ -61,16 +65,20 @@ function App() {
         <Route path="/admin" element={<Protected roles={["super_admin", "admin"]}><AdminLayout /></Protected>}>
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="bulk-import" element={<AdminBulkImport />} />
           <Route path="categories" element={<AdminCategories />} />
           <Route path="brands" element={<AdminBrands />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="vendors" element={<AdminVendors />} />
+          <Route path="payouts" element={<AdminPayouts />} />
+          <Route path="flash-sales" element={<AdminFlashSales />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
         <Route path="/vendor" element={<Protected roles={["vendor"]}><VendorLayout /></Protected>}>
           <Route index element={<VendorDashboard />} />
           <Route path="products" element={<VendorProducts />} />
           <Route path="orders" element={<VendorOrders />} />
+          <Route path="wallet" element={<VendorWallet />} />
         </Route>
       </Routes>
     </BrowserRouter>
