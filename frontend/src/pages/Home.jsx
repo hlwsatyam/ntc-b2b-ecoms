@@ -4,7 +4,7 @@ import api from "../api";
 import { useSettings } from "../store";
 import ProductCard from "../components/ProductCard";
 import { resolveImg } from "../components/ImageUpload";
-import { Lightning, CaretRight, ShieldCheck, Truck, ArrowRight, Hash } from "@phosphor-icons/react";
+import { Lightning, CaretRight, ArrowRight, Hash } from "@phosphor-icons/react";
 
 function SectionHeader({ label, viewLink }) {
   return (
@@ -13,6 +13,72 @@ function SectionHeader({ label, viewLink }) {
       {viewLink && <Link to={viewLink} className="text-xs font-bold text-[color:var(--brand-primary)] hover:underline">View More →</Link>}
     </div>
   );
+}
+
+function SingleBanner({ s }) {
+  return (
+    <section className="container-max mt-6">
+      <Link to={s.link || "/products"} className="block relative rounded overflow-hidden aspect-[5/1] bg-slate-100" data-testid={`section-banner-${s.id}`}>
+        {s.image && <img src={resolveImg(s.image)} alt={s.title || ""} className="absolute inset-0 w-full h-full object-cover" />}
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(15,23,42,0.7), transparent)" }} />
+        <div className="relative h-full flex flex-col justify-center p-6 md:p-8 text-white max-w-md">
+          {s.title && <div className="font-display font-black text-xl md:text-2xl">{s.title}</div>}
+          {s.subtitle && <div className="text-xs mt-1 opacity-90">{s.subtitle}</div>}
+          <span className="mt-3 inline-flex w-fit pill pill-red uppercase">{s.cta || "Explore now"} →</span>
+        </div>
+      </Link>
+    </section>
+  );
+}
+
+function BannerRow({ s }) {
+  const items = s.banners || [];
+  if (!items.length) return null;
+  return (
+    <section className="container-max">
+      <SectionHeader label={s.title || "Featured"} viewLink={s.viewLink} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid={`section-banner-row-${s.id}`}>
+        {items.slice(0, 4).map((b, i) => (
+          <Link key={i} to={b.link || "/products"} className="card-flat relative overflow-hidden aspect-[4/3] group">
+            {b.image && <img src={resolveImg(b.image)} alt={b.title || ""} className="absolute inset-0 w-full h-full object-cover" />}
+            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 45%, rgba(15,23,42,0.85))" }} />
+            <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+              <div className="font-display font-black">{b.title}</div>
+              <div className="mt-1 flex items-center text-[11px] font-bold text-[color:var(--brand-accent)]">Explore now <CaretRight size={12} weight="bold" /></div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProductRail({ s }) {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (s.categoryId) p.set("category", s.categoryId);
+    if (s.source === "featured") p.set("featured", "true");
+    if (s.source === "popular") p.set("sort", "popular");
+    p.set("limit", String(s.limit || 12));
+    api.get(`/products?${p.toString()}`).then((r) => setItems(r.data.items || [])).catch(() => {});
+  }, [s]);
+  return (
+    <section className="container-max">
+      <SectionHeader label={s.title || "Products"} viewLink={s.viewLink} />
+      <div className="hscroll" data-testid={`section-rail-${s.id}`}>
+        {items.map((p) => <div key={p.id} className="w-[190px]"><ProductCard p={p} /></div>)}
+      </div>
+    </section>
+  );
+}
+
+function RenderSection({ s }) {
+  if (s.visible === false) return null;
+  if (s.type === "banner") return <SingleBanner s={s} />;
+  if (s.type === "banner_row") return <BannerRow s={s} />;
+  if (s.type === "products") return <ProductRail s={s} />;
+  return null;
 }
 
 export default function Home() {
@@ -30,13 +96,13 @@ export default function Home() {
   }, []);
 
   const banner = settings?.homepage?.heroBanners?.[0];
-  const promoCards = settings?.homepage?.promoCards || [];
+  const promoCards = (settings?.homepage?.promoCards || []).filter((c) => c.visible !== false);
   const midBanner = settings?.homepage?.midBanner;
+  const sections = settings?.homepage?.sections || [];
   const activeFlash = flash[0];
 
   return (
     <div>
-      {/* 1. HERO BANNER (admin-managed) */}
       <section className="container-max py-4">
         <Link to={banner?.link || "/products"} className="block relative overflow-hidden rounded aspect-[3.5/1] bg-slate-100" data-testid="hero-banner">
           {banner?.image && <img src={resolveImg(banner.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />}
@@ -50,11 +116,10 @@ export default function Home() {
         </Link>
       </section>
 
-      {/* 2. 8 PROMO CARDS (admin-managed image + link each) */}
       {promoCards.length > 0 && (
         <section className="container-max">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3" data-testid="promo-cards">
-            {promoCards.slice(0, 8).map((pc, i) => (
+            {promoCards.map((pc, i) => (
               <Link key={pc.id || i} to={pc.link || "/products"} className="card-flat relative aspect-square overflow-hidden group" data-testid={`promo-card-${i}`}>
                 {pc.image && <img src={resolveImg(pc.image)} alt={pc.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />}
                 <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, transparent 55%, rgba(15,23,42,0.85))" }} />
@@ -65,7 +130,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* Brand strip */}
       {brands.length > 0 && (
         <section className="container-max py-6">
           <div className="hscroll">
@@ -91,7 +155,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* 3. TOP SELLING PRODUCT LIST */}
       <section className="container-max">
         <SectionHeader label="Top Selling" viewLink="/products?sort=popular" />
         <div className="hscroll">
@@ -101,7 +164,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. MID BANNER (admin-managed) */}
       {midBanner?.image && (
         <section className="container-max mt-8">
           <Link to={midBanner.link || "/products"} className="block relative rounded overflow-hidden aspect-[5/1] bg-slate-100" data-testid="mid-banner">
@@ -116,15 +178,9 @@ export default function Home() {
         </section>
       )}
 
-      {/* All products list */}
-      <section className="container-max">
-        <SectionHeader label="Featured Wholesale Deals" viewLink="/products" />
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {featured.slice(0, 12).map((p) => <ProductCard key={p.id} p={p} />)}
-        </div>
-      </section>
+      {/* ADMIN-DEFINED SECTIONS */}
+      {sections.map((s) => <RenderSection key={s.id} s={s} />)}
 
-      {/* 5. CATEGORY #SUBCATEGORY HASHTAG LIST */}
       <section className="container-max mt-10 mb-6" data-testid="category-hashtag-list">
         <div className="card-flat p-6">
           <h2 className="section-title mb-4">Shop by category</h2>
@@ -146,7 +202,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* B2B CTA */}
       <section className="container-max py-10">
         <div className="rounded p-6 md:p-10 grid md:grid-cols-2 gap-6 items-center" style={{ background: "var(--brand-secondary)" }}>
           <div className="text-white">

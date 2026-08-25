@@ -152,34 +152,155 @@ export default function AdminSettings() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[...Array(8)].map((_, i) => {
-              const card = promoCards[i] || { id: `pc${i + 1}`, image: "", title: "", link: "/products" };
+              const card = promoCards[i] || { id: `pc${i + 1}`, image: "", title: "", link: "/products", visible: true };
+              const move = (dir) => {
+                const next = [...promoCards];
+                while (next.length < 8) next.push({ id: `pc${next.length + 1}`, image: "", title: "", link: "/products", visible: true });
+                const j = i + dir;
+                if (j < 0 || j >= next.length) return;
+                [next[i], next[j]] = [next[j], next[i]];
+                set("homepage.promoCards", next);
+              };
+              const patch = (k, v) => {
+                const next = [...promoCards];
+                while (next.length < 8) next.push({ id: `pc${next.length + 1}`, image: "", title: "", link: "/products", visible: true });
+                next[i] = { ...next[i], [k]: v };
+                set("homepage.promoCards", next);
+              };
+              const hidden = card.visible === false;
               return (
-                <div key={i} className="border border-[color:var(--brand-border)] rounded p-3 space-y-2" data-testid={`promo-card-edit-${i}`}>
-                  <div className="text-[11px] font-semibold text-slate-500">Card #{i + 1}</div>
-                  <ImageUpload
-                    value={card.image}
-                    onChange={(v) => {
-                      const next = [...promoCards];
-                      while (next.length < 8) next.push({ id: `pc${next.length + 1}`, image: "", title: "", link: "/products" });
-                      next[i] = { ...next[i], image: v };
-                      set("homepage.promoCards", next);
-                    }}
-                    label=""
-                    testid={`promo-upload-${i}`}
-                    height={80}
-                  />
-                  <input placeholder="Title" value={card.title} onChange={(e) => {
-                    const next = [...promoCards];
-                    while (next.length < 8) next.push({ id: `pc${next.length + 1}`, image: "", title: "", link: "/products" });
-                    next[i] = { ...next[i], title: e.target.value };
-                    set("homepage.promoCards", next);
-                  }} className="w-full border rounded px-2 py-1 text-xs" data-testid={`promo-title-${i}`} />
-                  <input placeholder="/products?category=..." value={card.link} onChange={(e) => {
-                    const next = [...promoCards];
-                    while (next.length < 8) next.push({ id: `pc${next.length + 1}`, image: "", title: "", link: "/products" });
-                    next[i] = { ...next[i], link: e.target.value };
-                    set("homepage.promoCards", next);
-                  }} className="w-full border rounded px-2 py-1 text-[11px] sku" data-testid={`promo-link-${i}`} />
+                <div key={i} className={`border border-[color:var(--brand-border)] rounded p-3 space-y-2 ${hidden ? "opacity-50" : ""}`} data-testid={`promo-card-edit-${i}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-semibold text-slate-500">Card #{i + 1}{hidden ? " · hidden" : ""}</div>
+                    <div className="flex gap-1">
+                      <button onClick={() => move(-1)} className="text-[11px] px-1.5 border rounded hover:bg-slate-100" data-testid={`promo-up-${i}`} title="Move up">↑</button>
+                      <button onClick={() => move(1)} className="text-[11px] px-1.5 border rounded hover:bg-slate-100" data-testid={`promo-down-${i}`} title="Move down">↓</button>
+                      <button onClick={() => patch("visible", hidden)} className="text-[11px] px-1.5 border rounded hover:bg-slate-100" data-testid={`promo-toggle-${i}`} title="Show/hide">{hidden ? "Show" : "Hide"}</button>
+                    </div>
+                  </div>
+                  <ImageUpload value={card.image} onChange={(v) => patch("image", v)} label="" testid={`promo-upload-${i}`} height={80} />
+                  <input placeholder="Title" value={card.title} onChange={(e) => patch("title", e.target.value)} className="w-full border rounded px-2 py-1 text-xs" data-testid={`promo-title-${i}`} />
+                  <input placeholder="/products?category=..." value={card.link} onChange={(e) => patch("link", e.target.value)} className="w-full border rounded px-2 py-1 text-[11px] sku" data-testid={`promo-link-${i}`} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* HOMEPAGE SECTIONS BUILDER */}
+        <div className="card-flat p-5 md:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="font-display font-bold text-lg">Homepage Sections</div>
+              <div className="text-xs text-slate-500">Extra rows shown between the mid banner and the category list</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => {
+                const list = s.homepage?.sections || [];
+                set("homepage.sections", [...list, { id: `sec-${Date.now()}`, type: "banner", visible: true, image: "", title: "New banner", link: "/products" }]);
+              }} className="btn-ghost text-xs" data-testid="add-section-banner">+ Banner</button>
+              <button onClick={() => {
+                const list = s.homepage?.sections || [];
+                set("homepage.sections", [...list, { id: `sec-${Date.now()}`, type: "banner_row", visible: true, title: "New row", banners: [{ image: "", title: "", link: "/products" }, { image: "", title: "", link: "/products" }, { image: "", title: "", link: "/products" }, { image: "", title: "", link: "/products" }] }]);
+              }} className="btn-ghost text-xs" data-testid="add-section-row">+ Banner Row</button>
+              <button onClick={() => {
+                const list = s.homepage?.sections || [];
+                set("homepage.sections", [...list, { id: `sec-${Date.now()}`, type: "products", visible: true, title: "New product rail", source: "featured", categoryId: "", limit: 12, viewLink: "/products" }]);
+              }} className="btn-ghost text-xs" data-testid="add-section-products">+ Product Rail</button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {(s.homepage?.sections || []).length === 0 && (
+              <div className="text-center text-xs text-slate-500 py-6 border border-dashed rounded">No custom sections yet. Add a banner, banner row, or product rail above.</div>
+            )}
+            {(s.homepage?.sections || []).map((sec, idx, list) => {
+              const move = (d) => {
+                const next = [...list];
+                const j = idx + d;
+                if (j < 0 || j >= next.length) return;
+                [next[idx], next[j]] = [next[j], next[idx]];
+                set("homepage.sections", next);
+              };
+              const patch = (path, v) => {
+                const next = [...list];
+                const cur = { ...next[idx] };
+                const keys = path.split(".");
+                let obj = cur;
+                for (let i = 0; i < keys.length - 1; i++) { obj[keys[i]] = { ...(obj[keys[i]] || {}) }; obj = obj[keys[i]]; }
+                obj[keys[keys.length - 1]] = v;
+                next[idx] = cur;
+                set("homepage.sections", next);
+              };
+              const del = () => {
+                if (!window.confirm("Delete this section?")) return;
+                const next = list.filter((_, i) => i !== idx);
+                set("homepage.sections", next);
+              };
+              const hidden = sec.visible === false;
+              return (
+                <div key={sec.id} className={`border border-[color:var(--brand-border)] rounded p-3 ${hidden ? "opacity-50" : ""}`} data-testid={`section-${sec.id}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="pill pill-slate uppercase text-[10px]">{sec.type.replace("_", " ")}</span>
+                    <input value={sec.title || ""} onChange={(e) => patch("title", e.target.value)} placeholder="Section title" className="flex-1 border rounded px-2 py-1 text-xs" data-testid={`section-title-${sec.id}`} />
+                    <button onClick={() => move(-1)} className="text-[11px] px-2 border rounded hover:bg-slate-100" data-testid={`section-up-${sec.id}`}>↑</button>
+                    <button onClick={() => move(1)} className="text-[11px] px-2 border rounded hover:bg-slate-100" data-testid={`section-down-${sec.id}`}>↓</button>
+                    <button onClick={() => patch("visible", hidden)} className="text-[11px] px-2 border rounded hover:bg-slate-100" data-testid={`section-toggle-${sec.id}`}>{hidden ? "Show" : "Hide"}</button>
+                    <button onClick={del} className="text-[11px] text-red-500 px-2" data-testid={`section-del-${sec.id}`}>Delete</button>
+                  </div>
+
+                  {sec.type === "banner" && (
+                    <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-3 mt-3">
+                      <ImageUpload value={sec.image} onChange={(v) => patch("image", v)} label="Banner image" testid={`section-img-${sec.id}`} aspect="banner" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input placeholder="Subtitle" value={sec.subtitle || ""} onChange={(e) => patch("subtitle", e.target.value)} className="col-span-2 border rounded px-2 py-1 text-xs" />
+                        <input placeholder="CTA label" value={sec.cta || ""} onChange={(e) => patch("cta", e.target.value)} className="border rounded px-2 py-1 text-xs" />
+                        <input placeholder="/products" value={sec.link || ""} onChange={(e) => patch("link", e.target.value)} className="border rounded px-2 py-1 text-xs sku" />
+                      </div>
+                    </div>
+                  )}
+
+                  {sec.type === "banner_row" && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                      {(sec.banners || []).map((b, bi) => (
+                        <div key={bi} className="border border-[color:var(--brand-border)] rounded p-2 space-y-1">
+                          <ImageUpload value={b.image} onChange={(v) => {
+                            const bs = [...(sec.banners || [])];
+                            bs[bi] = { ...bs[bi], image: v };
+                            patch("banners", bs);
+                          }} label="" testid={`row-img-${sec.id}-${bi}`} height={70} />
+                          <input placeholder="Title" value={b.title || ""} onChange={(e) => {
+                            const bs = [...(sec.banners || [])];
+                            bs[bi] = { ...bs[bi], title: e.target.value };
+                            patch("banners", bs);
+                          }} className="w-full border rounded px-2 py-1 text-[11px]" />
+                          <input placeholder="Link" value={b.link || ""} onChange={(e) => {
+                            const bs = [...(sec.banners || [])];
+                            bs[bi] = { ...bs[bi], link: e.target.value };
+                            patch("banners", bs);
+                          }} className="w-full border rounded px-2 py-1 text-[10px] sku" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {sec.type === "products" && (
+                    <div className="grid grid-cols-4 gap-2 mt-3">
+                      <label className="text-[11px] col-span-1"><span className="text-slate-500">Source</span>
+                        <select value={sec.source || "featured"} onChange={(e) => patch("source", e.target.value)} className="mt-0.5 w-full border rounded px-2 py-1 text-xs">
+                          <option value="featured">Featured</option>
+                          <option value="popular">Popular</option>
+                          <option value="category">Category</option>
+                        </select>
+                      </label>
+                      <label className="text-[11px] col-span-2"><span className="text-slate-500">Category ID (if source=category)</span>
+                        <input value={sec.categoryId || ""} onChange={(e) => patch("categoryId", e.target.value)} className="mt-0.5 w-full border rounded px-2 py-1 text-xs sku" /></label>
+                      <label className="text-[11px] col-span-1"><span className="text-slate-500">Limit</span>
+                        <input type="number" value={sec.limit || 12} onChange={(e) => patch("limit", parseInt(e.target.value) || 12)} className="mt-0.5 w-full border rounded px-2 py-1 text-xs" /></label>
+                      <label className="text-[11px] col-span-4"><span className="text-slate-500">"View more" link</span>
+                        <input value={sec.viewLink || ""} onChange={(e) => patch("viewLink", e.target.value)} placeholder="/products?featured=true" className="mt-0.5 w-full border rounded px-2 py-1 text-xs sku" /></label>
+                    </div>
+                  )}
                 </div>
               );
             })}
