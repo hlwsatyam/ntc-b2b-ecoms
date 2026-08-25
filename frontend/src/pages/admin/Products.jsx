@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../api";
 import { toast } from "sonner";
 import { Plus, PencilSimple, Trash } from "@phosphor-icons/react";
+import ImageUpload from "../../components/ImageUpload";
 
 export default function AdminProducts() {
   const [items, setItems] = useState([]);
@@ -77,8 +78,9 @@ export default function AdminProducts() {
                 <label key={k} className="text-xs"><span className="text-slate-500">{l}</span>
                   <input type="number" value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} className="mt-1 w-full border rounded px-3 py-2" data-testid={`prod-${k}`} /></label>
               ))}
-              <label className="col-span-2 text-xs"><span className="text-slate-500">Image URL</span>
-                <input value={f.images[0] || ""} onChange={(e) => setF({ ...f, images: [e.target.value] })} className="mt-1 w-full border rounded px-3 py-2" placeholder="https://..." /></label>
+              <label className="col-span-2 text-xs">
+                <ImageUpload value={f.images[0] || ""} onChange={(v) => setF({ ...f, images: v ? [v] : [] })} label="Product image" testid="prod-image" />
+              </label>
               <label className="col-span-2 text-xs"><span className="text-slate-500">Description</span>
                 <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} rows={3} className="mt-1 w-full border rounded px-3 py-2" /></label>
             </div>

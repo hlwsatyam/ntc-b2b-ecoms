@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
 import { toast } from "sonner";
+import ImageUpload, { resolveImg } from "../../components/ImageUpload";
 
 export default function AdminBrands() {
   const [brands, setBrands] = useState([]);
@@ -8,7 +9,10 @@ export default function AdminBrands() {
   const [f, setF] = useState({ name: "", logo: "", description: "", isActive: true });
   const load = () => api.get("/brands").then((r) => setBrands(r.data || []));
   useEffect(() => { load(); }, []);
-  const save = async () => { try { await api.post("/brands", f); toast.success("Saved"); setShow(false); setF({ name: "", logo: "", description: "", isActive: true }); load(); } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); } };
+  const save = async () => {
+    try { await api.post("/brands", f); toast.success("Saved"); setShow(false); setF({ name: "", logo: "", description: "", isActive: true }); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
   const del = async (id) => { if (window.confirm("Delete?")) { await api.delete(`/brands/${id}`); load(); } };
   return (
     <div>
@@ -18,8 +22,12 @@ export default function AdminBrands() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {brands.map((b) => (
-          <div key={b.id} className="card-flat p-4 flex items-center justify-between" data-testid={`brand-${b.slug}`}>
-            <div><div className="font-semibold">{b.name}</div><div className="text-[11px] text-slate-500 sku">{b.slug}</div></div>
+          <div key={b.id} className="card-flat p-4 flex items-center gap-3" data-testid={`brand-${b.slug}`}>
+            {b.logo ? <img src={resolveImg(b.logo)} alt={b.name} className="w-12 h-12 object-contain" /> : <div className="w-12 h-12 bg-slate-100 rounded" />}
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold truncate">{b.name}</div>
+              <div className="text-[11px] text-slate-500 sku truncate">{b.slug}</div>
+            </div>
             <button onClick={() => del(b.id)} className="text-red-500 text-xs">×</button>
           </div>
         ))}
@@ -30,10 +38,13 @@ export default function AdminBrands() {
             <h2 className="text-2xl font-black mb-4">New Brand</h2>
             <div className="space-y-3">
               <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Name" className="w-full border rounded px-3 py-2" data-testid="brand-name" />
-              <input value={f.logo} onChange={(e) => setF({ ...f, logo: e.target.value })} placeholder="Logo URL" className="w-full border rounded px-3 py-2" />
+              <ImageUpload value={f.logo} onChange={(v) => setF({ ...f, logo: v })} label="Logo" testid="brand-logo" />
               <textarea value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Description" rows={2} className="w-full border rounded px-3 py-2" />
             </div>
-            <div className="mt-4 flex justify-end gap-2"><button onClick={() => setShow(false)} className="btn-ghost">Cancel</button><button onClick={save} className="btn-primary" data-testid="save-brand">Save</button></div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShow(false)} className="btn-ghost">Cancel</button>
+              <button onClick={save} className="btn-primary" data-testid="save-brand">Save</button>
+            </div>
           </div>
         </div>
       )}

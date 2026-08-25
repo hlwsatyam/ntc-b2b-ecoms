@@ -102,6 +102,22 @@ DEFAULT_SETTINGS = {
                 "link": "/products",
             }
         ],
+        "promoCards": [
+            {"id": "pc1", "image": "https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=400", "title": "Test & Measure",   "link": "/products?category=c-electronics"},
+            {"id": "pc2", "image": "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400", "title": "Automotive",      "link": "/products?category=c-industrial"},
+            {"id": "pc3", "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400", "title": "Controlling Devices", "link": "/products?category=c-components"},
+            {"id": "pc4", "image": "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=400", "title": "Personal Care",   "link": "/products"},
+            {"id": "pc5", "image": "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400", "title": "New Brands",      "link": "/products?featured=true"},
+            {"id": "pc6", "image": "https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=400", "title": "Geysers",         "link": "/products?category=c-electronics"},
+            {"id": "pc7", "image": "https://images.unsplash.com/photo-1558379850-a2ea4924d2c5?w=400",    "title": "Headphones & Speakers", "link": "/products?category=c-electronics"},
+            {"id": "pc8", "image": "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=400", "title": "Safety Gear",     "link": "/products?category=c-safety"},
+        ],
+        "midBanner": {
+            "image": "https://images.pexels.com/photos/18631424/pexels-photo-18631424.jpeg",
+            "title": "Unlock Easy Deals — Get ₹500 OFF Today",
+            "subtitle": "Register with code BULK10",
+            "link": "/products",
+        },
     },
     "seo": {
         "title": "TradeHub — India's B2B Marketplace",

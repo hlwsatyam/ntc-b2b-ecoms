@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../../api";
 import { toast } from "sonner";
 import { Plus, Trash, Lightning } from "@phosphor-icons/react";
+import ImageUpload from "../../components/ImageUpload";
 
 const toLocal = (iso) => iso ? new Date(iso).toISOString().slice(0, 16) : "";
 const fromLocal = (l) => l ? new Date(l).toISOString() : "";
@@ -86,8 +87,8 @@ export default function AdminFlashSales() {
                 <input type="datetime-local" value={f.startsAt} onChange={(e) => setF({ ...f, startsAt: e.target.value })} className="mt-1 w-full border rounded px-3 py-2" data-testid="flashsale-start" /></label>
               <label className="text-xs"><span className="text-slate-500">Ends at</span>
                 <input type="datetime-local" value={f.endsAt} onChange={(e) => setF({ ...f, endsAt: e.target.value })} className="mt-1 w-full border rounded px-3 py-2" data-testid="flashsale-end" /></label>
-              <label className="col-span-2 text-xs"><span className="text-slate-500">Banner image URL (optional)</span>
-                <input value={f.banner} onChange={(e) => setF({ ...f, banner: e.target.value })} className="mt-1 w-full border rounded px-3 py-2" placeholder="https://..." /></label>
+              <label className="col-span-2 text-xs"><span className="text-slate-500">Banner (optional)</span>
+                <ImageUpload value={f.banner} onChange={(v) => setF({ ...f, banner: v })} label="" testid="flashsale-banner" aspect="banner" /></label>
               <div className="col-span-2 text-xs">
                 <span className="text-slate-500">Products (multi-select, optional)</span>
                 <div className="mt-1 max-h-40 overflow-y-auto border rounded p-2 grid grid-cols-2 gap-1">
