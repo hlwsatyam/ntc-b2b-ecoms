@@ -31,9 +31,29 @@ export default function Account() {
                 <div className="sku font-semibold">{o.orderNo}</div>
                 <div className="text-xs text-slate-500">{o.items.length} items · {new Date(o.createdAt).toLocaleDateString()}</div>
               </div>
-              <div className="text-right">
-                <div className="font-bold sku">₹{o.total?.toLocaleString("en-IN")}</div>
-                <span className="pill pill-blue">{o.status}</span>
+              <div className="text-right flex items-center gap-3">
+                <div>
+                  <div className="font-bold sku">₹{o.total?.toLocaleString("en-IN")}</div>
+                  <span className="pill pill-blue">{o.status}</span>
+                </div>
+                <a
+                  href={`${process.env.REACT_APP_BACKEND_URL}/api/orders/${o.id}/invoice`}
+                  target="_blank" rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const token = localStorage.getItem("token");
+                    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/${o.id}/invoice`, { headers: { Authorization: `Bearer ${token}` } })
+                      .then((r) => r.blob())
+                      .then((b) => {
+                        const url = URL.createObjectURL(b);
+                        const a = document.createElement("a");
+                        a.href = url; a.download = `Invoice-${o.orderNo}.pdf`; a.click();
+                        URL.revokeObjectURL(url);
+                      });
+                  }}
+                  className="text-xs font-bold text-[color:var(--brand-primary)] hover:underline"
+                  data-testid={`invoice-${o.orderNo}`}
+                >Invoice PDF</a>
               </div>
             </div>
           ))}

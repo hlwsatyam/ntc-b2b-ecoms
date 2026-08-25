@@ -28,7 +28,15 @@ export default function AdminOrders() {
                     {["pending_payment","confirmed","processing","packed","shipped","delivered","cancelled","returned"].map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </td>
-                <td className="p-3 text-right"><button onClick={() => ship(o.id)} className="text-[color:var(--brand-primary)] text-xs font-semibold" data-testid={`ship-${o.orderNo}`}>Ship via Shiprocket</button></td>
+                <td className="p-3 text-right flex items-center justify-end gap-3">
+                  <button onClick={() => {
+                    const token = localStorage.getItem("token");
+                    fetch(`${process.env.REACT_APP_BACKEND_URL}/api/orders/${o.id}/invoice`, { headers: { Authorization: `Bearer ${token}` } })
+                      .then((r) => r.blob())
+                      .then((b) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `Invoice-${o.orderNo}.pdf`; a.click(); URL.revokeObjectURL(u); });
+                  }} className="text-[color:var(--brand-primary)] text-xs font-semibold" data-testid={`invoice-${o.orderNo}`}>Invoice PDF</button>
+                  <button onClick={() => ship(o.id)} className="text-slate-600 text-xs font-semibold" data-testid={`ship-${o.orderNo}`}>Ship via Shiprocket</button>
+                </td>
               </tr>
             ))}
           </tbody>

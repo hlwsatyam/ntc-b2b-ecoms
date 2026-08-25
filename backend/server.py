@@ -1145,6 +1145,31 @@ async def delete_flash_sale(fid: str, user: dict = Depends(require_permission("c
     return {"ok": True}
 
 
+@api.get("/orders/{oid}/invoice")
+async def download_invoice(oid: str, user: dict = Depends(get_current_user)):
+    from fastapi.responses import StreamingResponse
+    from invoice_pdf import build_invoice_pdf
+    order = await db.orders.find_one({"id": oid}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if user["role"] not in ("super_admin", "admin"):
+        if order.get("userId") != user["id"]:
+            if user["role"] == "vendor":
+                vendor = await db.vendors.find_one({"userId": user["id"]})
+                if not vendor or not any(i.get("vendorId") == vendor["id"] for i in order.get("items", [])):
+                    raise HTTPException(403, "Forbidden")
+            else:
+                raise HTTPException(403, "Forbidden")
+    settings = await db.settings.find_one({"id": "global"}, {"_id": 0}) or {}
+    buyer = await db.users.find_one({"id": order["userId"]}, {"_id": 0, "password": 0}) or {}
+    pdf = await build_invoice_pdf(order, settings, buyer)
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="Invoice-{order.get("orderNo")}.pdf"'},
+    )
+
+
 # ============ HEALTH ============
 @api.get("/")
 async def root():
