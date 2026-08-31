@@ -1,5 +1,5 @@
 """B2B Marketplace API — Auth, Catalog, Cart, Orders, Vendors, RFQ, Admin."""
-import os, uuid, logging, io
+import os, uuid, logging, io, asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List
@@ -11,7 +11,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from bson import ObjectId
 
-from config import MONGO_URL, DB_NAME, DEFAULT_SETTINGS, UPLOAD_DIR, RAZORPAY_KEY_ID
+from config import (
+    MONGO_URL, DB_NAME, DEFAULT_SETTINGS, UPLOAD_DIR,
+    RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET,
+)
 from auth_utils import (
     hash_pw, verify_pw, make_access_token, make_refresh_token, decode_token,
     get_current_user, get_current_user_optional, require_permission, require_roles,
@@ -19,7 +22,9 @@ from auth_utils import (
 from integrations import (
     razor_create_order, razor_verify_signature, razor_verify_webhook,
     ship_create_order, ship_track_awb, send_email, price_for_qty,
+    razor_client_with, razor_create_order_with, razor_verify_signature_with,
 )
+from gst_verify import verify_gstin, gstin_checksum_ok
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("app")
@@ -535,6 +540,14 @@ async def checkout(data: CheckoutIn, user: dict = Depends(get_current_user)):
     if not summary["items"]:
         raise HTTPException(400, "Cart is empty")
 
+    # If buyer provided a GSTIN in the address, it must be verified first
+    if (data.address.gstin or "").strip():
+        u = await db.users.find_one({"id": user["id"]})
+        addr_gstin = data.address.gstin.strip().upper()
+        user_gstin = (u.get("gstin") or "").strip().upper()
+        if not (u.get("gstVerified") and user_gstin == addr_gstin):
+            raise HTTPException(400, "Please verify your GSTIN before placing the order (My Account > verify GST or use the Verify button in checkout).")
+
     # server-side price recompute (never trust client)
     discount, coupon = await _apply_coupon(data.couponCode or "", summary["subtotal"])
     total = max(0, summary["subtotal"] + summary["tax"] + summary["shipping"] - discount)
@@ -558,16 +571,26 @@ async def checkout(data: CheckoutIn, user: dict = Depends(get_current_user)):
     }
 
     razor_order = None
+    razor_client = None
     if data.paymentMethod == "razorpay":
+        # Prefer credentials from admin Settings > Integrations, fall back to env
+        int_cfg = (settings.get("integrations") or {}).get("razorpay") or {}
+        key_id = int_cfg.get("keyId") or RAZORPAY_KEY_ID
+        key_secret = int_cfg.get("keySecret") or RAZORPAY_KEY_SECRET
+        razor_client = razor_client_with(key_id, key_secret)
+        if not razor_client:
+            raise HTTPException(400, "Razorpay is not configured. Ask admin to set Razorpay Key ID and Secret in Admin > Settings.")
         try:
-            razor_order = await razor_create_order(
+            razor_order = await razor_create_order_with(
+                razor_client,
                 int(total * 100), order_no,
                 {"orderId": order_id, "userId": user["id"]},
             )
             order["razorpayOrderId"] = razor_order["id"]
+            order["razorpayKeyId"] = key_id
         except Exception as e:
-            log.warning(f"razorpay order create failed: {e}")
-            raise HTTPException(502, f"Payment gateway error: {e}")
+            # Use 4xx so the ingress passes the JSON body through (5xx bodies get replaced by an HTML error page)
+            raise HTTPException(400, f"Payment gateway error: {e}")
     else:
         order["paymentStatus"] = "cod_pending"
         order["timeline"].append({"status": "confirmed", "at": now()})
@@ -592,7 +615,7 @@ async def checkout(data: CheckoutIn, user: dict = Depends(get_current_user)):
         "order": clean(order),
         "razorpay": {
             "orderId": razor_order["id"], "amount": int(total * 100),
-            "currency": "INR", "keyId": RAZORPAY_KEY_ID,
+            "currency": "INR", "keyId": order.get("razorpayKeyId") or RAZORPAY_KEY_ID,
         } if razor_order else None,
     }
 
@@ -606,14 +629,18 @@ class PaymentVerifyIn(BaseModel):
 
 @api.post("/orders/verify-payment")
 async def verify_payment(data: PaymentVerifyIn, user: dict = Depends(get_current_user)):
-    ok = await razor_verify_signature(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature)
-    if not ok:
-        raise HTTPException(400, "Invalid payment signature")
     order = await db.orders.find_one({"id": data.orderId, "userId": user["id"]})
     if not order:
         raise HTTPException(404, "Order not found")
+    settings = await db.settings.find_one({"id": "global"}) or {}
+    int_cfg = (settings.get("integrations") or {}).get("razorpay") or {}
+    key_id = int_cfg.get("keyId") or RAZORPAY_KEY_ID
+    key_secret = int_cfg.get("keySecret") or RAZORPAY_KEY_SECRET
+    client = razor_client_with(key_id, key_secret)
+    ok = await razor_verify_signature_with(client, data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature)
+    if not ok:
+        raise HTTPException(400, "Invalid payment signature")
     if order.get("paymentStatus") != "paid":
-        # Now decrement stock + clear cart (post-verification)
         for it in order.get("items", []):
             await db.products.update_one({"id": it["productId"]}, {"$inc": {"stock": -it["quantity"], "soldCount": it["quantity"]}})
         await db.carts.update_one({"userId": user["id"]}, {"$set": {"items": []}})
@@ -835,23 +862,48 @@ async def create_review(data: ReviewIn, user: dict = Depends(get_current_user)):
     return clean(d)
 
 
-# ============ MEDIA UPLOAD ============
+# ============ MEDIA UPLOAD (Emergent object storage) ============
+from storage import put_object, get_object, APP_NAME
+
+
 @api.post("/media/upload")
 async def upload_file(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+    ext = os.path.splitext(file.filename or "")[1].lower().lstrip(".")
+    if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
         raise HTTPException(400, "Unsupported file type")
-    fname = f"{new_id()}{ext}"
-    path = UPLOAD_DIR / fname
     content = await file.read()
     if len(content) > 8 * 1024 * 1024:
         raise HTTPException(400, "File too large (max 8MB)")
-    path.write_bytes(content)
-    return {"url": f"/api/media/{fname}", "filename": fname}
+    filename = f"{new_id()}.{ext}"
+    obj_path = f"{APP_NAME}/uploads/{user['id']}/{filename}"
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "webp": "image/webp", "gif": "image/gif"}[ext]
+    try:
+        result = await asyncio.to_thread(put_object, obj_path, content, mime)
+        stored_path = result["path"]
+    except Exception as e:
+        log.warning(f"object storage failed, falling back to local: {e}")
+        (UPLOAD_DIR / filename).write_bytes(content)
+        stored_path = filename
+    await db.media.insert_one({
+        "id": new_id(), "userId": user["id"], "path": stored_path,
+        "filename": file.filename, "contentType": mime, "size": len(content),
+        "isDeleted": False, "createdAt": now(),
+    })
+    return {"url": f"/api/media/{stored_path.replace('/', '__')}", "filename": filename}
 
 
-@api.get("/media/{filename}")
+@api.get("/media/{filename:path}")
 async def serve_media(filename: str):
+    # Support both new object-storage paths (double-underscore encoded) and legacy local files
+    real = filename.replace("__", "/")
+    if "/" in real:
+        data, ctype = await asyncio.to_thread(get_object, real)
+        if data:
+            from fastapi.responses import Response
+            return Response(content=data, media_type=ctype or "application/octet-stream")
+        raise HTTPException(404, "Not found")
+    # legacy local fallback
     path = UPLOAD_DIR / filename
     if not path.exists():
         raise HTTPException(404, "Not found")
@@ -1168,6 +1220,45 @@ async def download_invoice(oid: str, user: dict = Depends(get_current_user)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="Invoice-{order.get("orderNo")}.pdf"'},
     )
+
+
+# ============ POLICIES + GST VERIFY ============
+@api.get("/policies")
+async def get_policies():
+    s = await db.settings.find_one({"id": "global"}) or DEFAULT_SETTINGS
+    return (s.get("policies") or DEFAULT_SETTINGS["policies"])
+
+
+@api.get("/policies/{key}")
+async def get_policy(key: str):
+    s = await db.settings.find_one({"id": "global"}) or DEFAULT_SETTINGS
+    p = (s.get("policies") or {}).get(key)
+    if not p or p.get("enabled") is False:
+        raise HTTPException(404, "Policy not available")
+    return p
+
+
+class GstIn(BaseModel):
+    gstin: str
+
+
+@api.post("/gst/verify")
+async def api_gst_verify(data: GstIn, user: dict = Depends(get_current_user)):
+    result = await verify_gstin(data.gstin)
+    if result.get("valid"):
+        await db.users.update_one({"id": user["id"]}, {"$set": {
+            "gstin": result["gstin"], "gstVerified": True, "gstVerifiedAt": now(),
+            "gstDetails": {"state": result.get("state"), "stateCode": result.get("stateCode"),
+                           "pan": result.get("pan"), "entityType": result.get("entityType"),
+                           "thirdParty": result.get("thirdParty")},
+        }})
+    return result
+
+
+@api.get("/gst/me")
+async def api_gst_me(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password": 0})
+    return {"gstin": u.get("gstin", ""), "gstVerified": bool(u.get("gstVerified")), "gstDetails": u.get("gstDetails")}
 
 
 # ============ HEALTH ============

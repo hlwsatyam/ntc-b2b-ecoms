@@ -90,6 +90,31 @@ DEFAULT_SETTINGS = {
         "compare": True,
         "flashSale": True,
     },
+    "policies": {
+        "terms": {
+            "enabled": True, "title": "Terms & Conditions",
+            "body": "By using our platform you agree to purchase goods and services as per the pricing displayed at checkout. All prices are inclusive of applicable GST unless mentioned. Orders once shipped cannot be cancelled. Any disputes are subject to the jurisdiction of the registered office of the company.",
+        },
+        "privacy": {
+            "enabled": True, "title": "Privacy Policy",
+            "body": "We collect only the information required to process your order, including name, address, phone, email and GSTIN. We never sell your data. Payment details are handled entirely by our PCI-DSS compliant payment gateway. You may request deletion of your account by writing to us at support@tradehub.example.",
+        },
+        "return": {
+            "enabled": True, "title": "Return Policy",
+            "body": "Returns are accepted within 7 days of delivery for defective, damaged or wrongly shipped items. Please raise a return request from your Account > Orders page. Refunds are issued to the original payment method within 5-7 business days after quality-check clears.",
+        },
+        "shipping": {
+            "enabled": True, "title": "Shipping Policy",
+            "body": "Standard delivery takes 3-7 business days pan-India via Shiprocket-powered logistics. Free shipping on bulk orders above ₹10,000. COD orders may require a call verification before dispatch. Delivery timelines depend on serviceability of your pincode.",
+        },
+    },
+    "integrations": {
+        "razorpay": {
+            "keyId": "",
+            "keySecret": "",
+            "webhookSecret": "",
+        },
+    },
     "homepage": {
         "announcementBar": "Free shipping on bulk orders above ₹10,000 · GST invoice on every order",
         "heroBanners": [

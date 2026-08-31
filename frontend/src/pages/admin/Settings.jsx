@@ -307,6 +307,44 @@ export default function AdminSettings() {
           </div>
         </div>
 
+        {/* POLICIES */}
+        <div className="card-flat p-5 md:col-span-2">
+          <div className="font-display font-bold text-lg mb-3">Legal Policies</div>
+          <p className="text-xs text-slate-500 mb-3">Turn each policy on or off and edit its content. Enabled policies are visible on the storefront footer.</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            {["terms", "privacy", "return", "shipping"].map((k) => {
+              const p = s.policies?.[k] || { enabled: true, title: "", body: "" };
+              return (
+                <div key={k} className="border border-[color:var(--brand-border)] rounded p-3" data-testid={`policy-block-${k}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="pill pill-slate uppercase">{k}</span>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={p.enabled !== false} onChange={(e) => set(`policies.${k}.enabled`, e.target.checked)} data-testid={`policy-toggle-${k}`} />
+                      <span>{p.enabled !== false ? "Enabled" : "Disabled"}</span>
+                    </label>
+                  </div>
+                  <input value={p.title || ""} onChange={(e) => set(`policies.${k}.title`, e.target.value)} placeholder="Title" className="w-full border rounded px-2 py-1 text-sm mb-2" data-testid={`policy-title-${k}`} />
+                  <textarea value={p.body || ""} onChange={(e) => set(`policies.${k}.body`, e.target.value)} rows={6} placeholder="Body text" className="w-full border rounded px-2 py-1 text-xs" data-testid={`policy-body-${k}`} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RAZORPAY CREDENTIALS */}
+        <div className="card-flat p-5 md:col-span-2">
+          <div className="font-display font-bold text-lg mb-1">Razorpay Integration</div>
+          <p className="text-xs text-slate-500 mb-3">Overrides <code className="sku">.env</code> keys. Use Test keys (<span className="sku">rzp_test_*</span>) until your live account is activated to avoid authentication errors.</p>
+          <div className="grid md:grid-cols-3 gap-3">
+            <label className="text-xs"><span className="text-slate-500">Key ID</span>
+              <input value={s.integrations?.razorpay?.keyId || ""} onChange={(e) => set("integrations.razorpay.keyId", e.target.value)} placeholder="rzp_test_xxx" className="mt-1 w-full border rounded px-3 py-2 sku text-xs" data-testid="rzp-key-id" /></label>
+            <label className="text-xs"><span className="text-slate-500">Key Secret</span>
+              <input type="password" value={s.integrations?.razorpay?.keySecret || ""} onChange={(e) => set("integrations.razorpay.keySecret", e.target.value)} placeholder="****************" className="mt-1 w-full border rounded px-3 py-2 sku text-xs" data-testid="rzp-key-secret" /></label>
+            <label className="text-xs"><span className="text-slate-500">Webhook Secret</span>
+              <input value={s.integrations?.razorpay?.webhookSecret || ""} onChange={(e) => set("integrations.razorpay.webhookSecret", e.target.value)} className="mt-1 w-full border rounded px-3 py-2 sku text-xs" data-testid="rzp-webhook-secret" /></label>
+          </div>
+        </div>
+
         {/* Feature flags */}
         <div className="card-flat p-5 md:col-span-2">
           <div className="font-display font-bold text-lg mb-3">Feature Flags</div>

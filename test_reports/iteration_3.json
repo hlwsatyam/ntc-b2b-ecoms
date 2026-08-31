@@ -1,0 +1,42 @@
+{
+  "summary": "Focused re-test of the CRITICAL (Razorpay 502 -> ingress HTML) and HIGH (no persistent checkout error banner) issues from iteration_2.json plus the requested regressions. Backend: ran tests/test_policies_gst_payment.py (17 cases) -> 17/17 PASSED, including test_razorpay_bad_settings_credentials_surface_auth_error which now asserts HTTP 400. Independent public-URL verification (tests/qa_iter3_rzp_public.py) with settings.integrations.razorpay = {keyId:'rzp_test_INVALID', keySecret:'BAD'}: POST /api/orders/checkout (razorpay) -> HTTP 400, content-type application/json, body {\"detail\":\"Payment gateway error: Razorpay authentication failed \u2014 check keyId/keySecret in Admin > Settings > Integrations\"} \u2014 confirmed the Cloudflare/ingress does NOT rewrite it to HTML. Frontend (Playwright 1920x1080, real preview URL): buyer login -> product p-1 (slug bosch-drill-450w) added to cart (\u20b912,974.10) -> /checkout, address filled, GSTIN left empty, paymentMethod=razorpay -> Pay & Place Order: inline banner [data-testid='checkout-error'] rendered inside the summary card with the exact Razorpay authentication message, plus a toast; banner still visible after 7s (persistent, not toast-only). Regression: switching to COD with EMPTY GSTIN then Place Order succeeded (redirect to /account) and the checkout-error banner was cleared (count 0) on the next action \u2014 confirms setCheckoutError('') on submit. Regression (backend): all 4 policies returned with enabled/title/body, GET /api/policies/{key} 200 for all 4, disabled -> 404 and admin toggle/persist covered by TestPolicies (passed); GST verify valid=true for 27AAPFU0939F1ZV, valid=false (checksum) for 29AABCB1234C1Z1, unverified GSTIN in address still blocks checkout with 400 'verify your GSTIN', /api/gst/verify requires auth (401). Cleanup: settings.integrations.razorpay reset to empty strings (verified via GET /api/settings), all policies re-enabled, cleanup_qa_data.py run.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/gst/verify",
+        "issue": "Pre-existing/out-of-scope: sheet.gstincheck.co.in third-party lookup still 404s for every GSTIN, so verification is checksum-only and thirdParty is always null (adds latency)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Storefront header (logged-in buyer on /checkout)",
+        "issues": ["Top utility bar still shows 'Log in' and 'Register' links while the user is authenticated (account chip shows 'Buyer'). Minor, cosmetic, pre-existing."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_policies_gst_payment.py",
+    "/app/backend/tests/qa_iter3_rzp_public.py",
+    "/app/test_reports/pytest/pytest_results_iter3.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Checkout.jsx catch block correctly handles string detail, Pydantic array detail and non-JSON/5xx fallback \u2014 no further change needed for this flow.",
+    "server.py still maps ALL razorpay SDK exceptions (including genuine gateway/network outages) to HTTP 400; consider 502 only for non-auth transport errors IF a proxy-safe error surface is added, otherwise leave as-is."
+  ],
+  "updated_files": [
+    "/app/backend/tests/qa_iter3_rzp_public.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Transient TEST_rzp_pub_* / TEST_* customers created by the tests; cleanup_qa_data.py executed. settings.integrations.razorpay reset to empty strings.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin@tradehub.com/admin123, buyer@tradehub.com/buyer123 (from /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Both iteration_2 issues are FIXED and verified end-to-end. Razorpay creds in settings are now EMPTY, so razorpay checkout falls back to env keys (which may be live and create a real order) \u2014 set bad creds explicitly if you need to test the failure path, and reset afterwards. Full 68-case suite (backend_test.py + test_policies_gst_payment.py) was not re-run this iteration; only the 17-case focused file was executed.",
+  "rca_of_the_issue": "Original RCA confirmed: 5xx bodies were replaced by the Cloudflare/ingress 'Bad gateway' HTML page, so axios saw no JSON detail. Changing the razorpay failure path to HTTPException(400) makes the JSON detail pass through untouched, and the new checkoutError state in Checkout.jsx renders it as a persistent inline banner."
+}

@@ -242,10 +242,10 @@ export default function StoreLayout() {
           <div>
             <div className="text-sm font-bold text-white mb-2">Policies</div>
             <ul className="space-y-1">
-              <li><Link to="/">Terms</Link></li>
-              <li><Link to="/">Privacy</Link></li>
-              <li><Link to="/">Return policy</Link></li>
-              <li><Link to="/">Shipping policy</Link></li>
+              <li><Link to="/policy/terms" data-testid="footer-terms">Terms</Link></li>
+              <li><Link to="/policy/privacy" data-testid="footer-privacy">Privacy</Link></li>
+              <li><Link to="/policy/return" data-testid="footer-return">Return policy</Link></li>
+              <li><Link to="/policy/shipping" data-testid="footer-shipping">Shipping policy</Link></li>
             </ul>
           </div>
         </div>

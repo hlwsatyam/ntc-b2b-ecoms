@@ -1,0 +1,80 @@
+{
+  "summary": "Focused retest of the 3 reported issues (admin-editable Legal Policies, Razorpay auth error surface, GSTIN verification at checkout) plus a full regression of the existing backend suite. Backend: 68 pytest cases (51 existing regression + 17 new in test_policies_gst_payment.py) — 67 passed, 1 failed. Verified GET /api/policies (all 4 keys with enabled/title/body), GET /api/policies/{key} (200 when enabled, 404 when disabled or unknown key), admin toggle+edit via PUT /api/settings persists and immediately affects the public endpoint, buyer cannot write settings (403). GST: /api/gst/me fresh defaults, malformed GSTIN -> valid=false 'Invalid GSTIN format', wrong-checksum 29AABCB1234C1Z1 -> valid=false 'checksum failed' and user NOT marked verified, real 27AAPFU0939F1ZV -> valid=true, state=Maharashtra, stateCode=27, pan=AAPFU0939F, persisted to /api/gst/me, lowercase input normalised, auth required on both endpoints. Checkout: unverified GSTIN in address -> 400 with 'verify your GSTIN' message; after /api/gst/verify the same checkout succeeds (order persisted, retrievable via GET /api/orders/{id}); empty GSTIN -> COD succeeds, cart cleared, razorpay=null. Razorpay: creds stored/read via settings.integrations.razorpay; with the current live env keys the checkout DID create a real razorpay order (frontend Razorpay modal opened with ₹12,974.10). Frontend (Playwright, 1920x1080): footer policy links -> /policy/<key>, all 4 policy pages render title+body, unknown key shows 'Not available'; /admin/settings shows Legal Policies (4 toggle/title/body editors) and Razorpay Integration (3 fields), toggling terms off + Save immediately makes /policy/terms show 'Not available', restore works; /checkout GST block: bad GSTIN -> red 'Not verified' pill + 'GSTIN checksum failed' toast + 'Verify your GSTIN to continue' blocker and Place Order blocked; valid GSTIN -> green 'Verified' pill + 'State: Maharashtra · PAN: AAPFU0939F' and COD order placed (redirect to /account); empty GSTIN -> COD succeeds.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/orders/checkout (paymentMethod=razorpay)",
+        "issue": "Razorpay failures are raised as HTTPException(502). The preview ingress/CDN discards any 502 body and replaces it with its own text/html '502: Bad gateway' page, so the new human-readable detail ('Razorpay authentication failed — check keyId/keySecret in Admin > Settings > Integrations') NEVER reaches the browser. Verified: localhost:8001 returns application/json with the correct detail, while the public URL returns content-type text/html and the HTML error page. In the UI the buyer gets no actionable message at all (best case the generic 'Checkout failed' fallback). Fix: return HTTP 400 (4xx is passed through untouched by the proxy) for gateway/credential errors in server.py line ~592 instead of 502.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/orders/checkout",
+        "issue": "Behaviour change (intentional but breaking for existing data): any GSTIN present in the address must match a verified GSTIN on the user record. Seeded/legacy buyers whose saved profile GSTIN was never verified are now hard-blocked at checkout until they hit Verify. Existing regression tests that posted a static GSTIN started failing; consider a one-time migration/backfill or an explicit 'unverified GSTIN — clear or verify' hint on the saved-address flow."
+      },
+      {
+        "endpoint": "POST /api/orders/verify-payment",
+        "issue": "Order lookup now happens before signature validation, so a bad signature on a non-existent order returns 404 instead of the previous 400 (behaviour change; test expectation updated to accept both)."
+      },
+      {
+        "endpoint": "POST /api/gst/verify",
+        "issue": "The third-party lookup at sheet.gstincheck.co.in returns HTTP 404 for every GSTIN (verified in backend logs), so thirdParty is always null and the response contains no real government registry data (legal name/status/address). Verification is checksum-only. If the requirement is a genuine third-party GSTIN verification, an authenticated provider (e.g. GST API / KYC vendor with an API key from env) is needed. Also every verify call adds ~1-3s latency for a call that can never succeed — consider dropping it or feature-flagging it."
+      },
+      {
+        "endpoint": "POST /api/gst/verify",
+        "issue": "No rate limiting / no re-verification expiry: a buyer can hammer the endpoint, and once gstVerified=true it never expires even if the GSTIN is later cancelled."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Checkout.jsx (razorpay error path)",
+        "issue": "When the razorpay checkout call fails (502), no visible error message was observed on screen within 8s of clicking 'Pay & Place Order' — the button simply re-enables and nothing happens. Root cause is the 502 body being replaced by the proxy HTML (e.response.data.detail is undefined) plus a short-lived toast. Surface a persistent inline error in the summary card, not only a toast.",
+        "selector": "[data-testid='place-order-btn']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Storefront footer (all pages)",
+        "issues": ["The bottom category link row renders empty labels for categories with no children ('Textiles & Apparel :' and 'Packaging :' followed by nothing) — hide the row when the child list is empty. Pre-existing, low priority."]
+      },
+      {
+        "screen": "Checkout GST block",
+        "issues": ["Minor: after a successful COD order the GSTIN input keeps the previously verified value in a light grey (disabled-looking) style while busy; contrast of that grey placeholder/value on the slate-50 panel is low."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_policies_gst_payment.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: change the razorpay failure path in POST /api/orders/checkout from HTTPException(502) to HTTPException(400) so the human-readable Razorpay message survives the ingress (502 bodies are replaced by an HTML 'Bad gateway' page). Re-run tests/test_policies_gst_payment.py::TestCheckoutRazorpay::test_razorpay_bad_settings_credentials_surface_auth_error to confirm.",
+    "Show a persistent inline error (not just a toast) in Checkout.jsx when /orders/checkout fails, and handle non-JSON error bodies (fall back to a generic gateway message).",
+    "Decide on real third-party GSTIN verification: sheet.gstincheck.co.in returns 404 for all GSTINs, so verification is checksum-only and thirdParty is always null. Either use a keyed provider from env or drop the dead HTTP call (it adds latency).",
+    "Consider a migration/UX hint for existing buyers whose saved profile GSTIN is unverified — they are now blocked at checkout."
+  ],
+  "critical_code_review_comments": [
+    "server.py: use 4xx for business/credential errors on user-facing endpoints; 5xx responses are rewritten by the edge proxy and the message is lost.",
+    "server.py is 1258 lines — split routers (policies/gst, orders/payments, settings) into modules.",
+    "integrations.py keeps both legacy razor()/razor_create_order (env-only, module-level singleton) and the new *_with variants; the legacy pair is now dead code for checkout — remove to avoid credential-source ambiguity.",
+    "checkout(): the GST precondition re-reads db.users then reads it again later for the email — reuse a single fetch.",
+    "gst_verify.verify_gstin(): the best-effort httpx GET is inside the request path with a 5s timeout and no caching; every verify pays for a call that always 404s."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_policies_gst_payment.py",
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "98% (67/68 pytest cases)", "frontend": "100% of tested flows (policies, admin settings panels, GST verify/block/place-order, empty-GSTIN COD) — except no actionable error shown on razorpay failure"},
+  "seed_data_creation": "Created temporary TEST_* customers via /api/auth/register and TEST COD orders; all TEST_ users and TEST orders deleted afterwards, buyer@tradehub.com GST state reset to unverified, buyer cart emptied, settings.policies restored to defaults and settings.integrations.razorpay reset to empty strings.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@tradehub.com/admin123, buyer@tradehub.com/buyer123, vendor@tradehub.com/vendor123 (from /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/ -n 0` (serial; the razorpay/settings tests mutate the global settings doc so -n 2 causes cross-test races and cart pollution of the shared buyer). backend_test.py ADDR now has gstin='' because checkout requires a verified GSTIN. GST-specific coverage lives in tests/test_policies_gst_payment.py. Only known failure: TestCheckoutRazorpay::test_razorpay_bad_settings_credentials_surface_auth_error — it asserts the checkout error is proxy-safe (4xx JSON); it will pass once the 502 becomes 400. If tests leave TEST_ data behind, delete users matching ^test_ and orders with address.fullName ^TEST, and reset buyer@tradehub.com gstVerified=false.",
+  "rca_of_the_issue": "Razorpay: the backend fix does produce a human-readable message, but it is returned with HTTP 502. The Cloudflare/ingress layer in front of the preview URL intercepts 5xx responses and substitutes its own text/html '502: Bad gateway' page (proved by comparing http://localhost:8001/api/orders/checkout -> application/json with the correct detail vs the public URL -> text/html error page for the identical request). Therefore the frontend's e.response.data.detail is undefined and the buyer sees no usable message. Using a 4xx status keeps the JSON body intact end-to-end. Separately, with the live keys currently in backend/.env the razorpay order creation actually succeeded (Razorpay modal opened for ₹12,974.10), so the original authentication failure only reproduces with invalid keys."
+}

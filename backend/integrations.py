@@ -20,6 +20,49 @@ def razor():
     return _razor
 
 
+def razor_client_with(key_id: str, key_secret: str):
+    """Build a razorpay client using explicit credentials (from DB settings)."""
+    if not key_id or not key_secret:
+        return None
+    return razorpay.Client(auth=(key_id, key_secret))
+
+
+async def razor_create_order_with(client, amount_paise: int, receipt: str, notes: dict = None):
+    if not client:
+        raise RuntimeError("Razorpay not configured — set keys in Admin > Settings or backend .env")
+    try:
+        return await asyncio.to_thread(
+            client.order.create,
+            data={"amount": amount_paise, "currency": "INR", "receipt": receipt, "notes": notes or {}}
+        )
+    except Exception as e:
+        msg = str(e)
+        try:
+            import razorpay.errors as _re
+            if isinstance(e, getattr(_re, "AuthenticationError", Exception)):
+                msg = "Razorpay authentication failed — check keyId/keySecret in Admin > Settings > Integrations"
+            elif isinstance(e, getattr(_re, "BadRequestError", Exception)):
+                msg = f"Razorpay bad request: {e}"
+        except Exception:
+            pass
+        log.warning(f"razorpay order create failed: {msg}")
+        raise RuntimeError(msg)
+
+
+async def razor_verify_signature_with(client, order_id: str, payment_id: str, signature: str) -> bool:
+    if not client:
+        return False
+    try:
+        await asyncio.to_thread(client.utility.verify_payment_signature, {
+            "razorpay_order_id": order_id,
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature,
+        })
+        return True
+    except Exception:
+        return False
+
+
 async def razor_create_order(amount_paise: int, receipt: str, notes: dict = None):
     client = razor()
     if not client:

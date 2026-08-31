@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Account from "./pages/Account";
 import RFQ from "./pages/RFQ";
+import Policy from "./pages/Policy";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminProducts from "./pages/admin/Products";
 import AdminCategories from "./pages/admin/Categories";
@@ -61,6 +62,7 @@ function App() {
           <Route path="register" element={<Register />} />
           <Route path="account" element={<Protected><Account /></Protected>} />
           <Route path="rfq" element={<Protected><RFQ /></Protected>} />
+          <Route path="policy/:key" element={<Policy />} />
         </Route>
         <Route path="/admin" element={<Protected roles={["super_admin", "admin"]}><AdminLayout /></Protected>}>
           <Route index element={<AdminDashboard />} />
