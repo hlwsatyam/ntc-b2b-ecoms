@@ -55,7 +55,7 @@ export const useSettings = create((set) => ({
   },
 }));
 
-export const useCart = create((set) => ({
+export const useCart = create((set, get) => ({
   cart: { items: [], subtotal: 0, tax: 0, shipping: 0, total: 0 },
   fetch: async () => {
     try {
@@ -66,10 +66,15 @@ export const useCart = create((set) => ({
   add: async (productId, quantity) => {
     const r = await api.post("/cart/add", { productId, quantity });
     set({ cart: r.data });
+    return r.data;
   },
   remove: async (productId) => {
     const r = await api.delete(`/cart/${productId}`);
     set({ cart: r.data });
+  },
+  qtyOf: (productId) => {
+    const it = (get().cart.items || []).find((i) => i.productId === productId);
+    return it ? it.quantity : 0;
   },
   clear: () => set({ cart: { items: [], subtotal: 0, tax: 0, shipping: 0, total: 0 } }),
 }));

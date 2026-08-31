@@ -85,6 +85,13 @@ export default function StoreLayout() {
     if (localStorage.getItem("token")) fetchCart();
   }, [fetchCart]);
 
+  // Refetch cart when user logs in/out or on route change (so header count is live everywhere)
+  useEffect(() => {
+    const handler = () => { if (localStorage.getItem("token")) fetchCart(); };
+    window.addEventListener("focus", handler);
+    return () => window.removeEventListener("focus", handler);
+  }, [fetchCart]);
+
   const brand = settings?.brand || { storeName: "TradeHub" };
 
   return (

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import { toast } from "sonner";
 import { useAuth, useCart } from "../store";
-import { CheckCircle, ShieldCheck, Package, Truck } from "@phosphor-icons/react";
+import { CheckCircle, ShieldCheck, Package, Truck, Check } from "@phosphor-icons/react";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -11,7 +11,7 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [img, setImg] = useState(0);
   const { user } = useAuth();
-  const { add } = useCart();
+  const { add, qtyOf } = useCart();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -22,6 +22,7 @@ export default function ProductDetail() {
   }, [slug]);
 
   if (!p) return <div className="container-max py-12">Loading...</div>;
+  const inCartQty = qtyOf(p.id);
 
   const currentPrice = (() => {
     if (!p.tierPricing?.length) return p.price;
@@ -93,9 +94,20 @@ export default function ProductDetail() {
             <span className="text-xs text-slate-500">Stock: {p.stock}</span>
           </div>
           <div className="mt-4 flex gap-3">
-            <button onClick={addToCart} className="btn-primary flex-1" data-testid="add-to-cart-btn">Add to Cart · ₹{(currentPrice * qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</button>
+            <button onClick={addToCart} className="btn-primary flex-1" data-testid="add-to-cart-btn">
+              {inCartQty > 0
+                ? `Update cart · ₹${(currentPrice * qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `Add to Cart · ₹${(currentPrice * qty).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </button>
             <button onClick={() => nav("/rfq", { state: { productId: p.id, productName: p.name } })} className="btn-ghost" data-testid="rfq-btn">Request Quote</button>
           </div>
+          {inCartQty > 0 && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700" data-testid="pdp-in-cart">
+              <Check size={14} weight="fill" className="text-emerald-600" />
+              <span><b className="sku">{inCartQty}</b> already in your cart</span>
+              <button onClick={() => nav("/cart")} className="text-[color:var(--brand-primary)] font-bold hover:underline">View cart →</button>
+            </div>
+          )}
 
           <div className="mt-6 grid grid-cols-3 gap-3 text-xs">
             <div className="flex items-center gap-2"><ShieldCheck size={18} weight="duotone" className="text-[color:var(--brand-primary)]" /> Verified vendor</div>
