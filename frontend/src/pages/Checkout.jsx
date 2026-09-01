@@ -22,6 +22,7 @@ export default function Checkout() {
   const [checkoutError, setCheckoutError] = useState("");
   const [gstStatus, setGstStatus] = useState(null); // {gstVerified, gstin, details}
   const [verifying, setVerifying] = useState(false);
+  const [bankDetails, setBankDetails] = useState(null);
 
   useEffect(() => {
     fetch();
@@ -30,6 +31,7 @@ export default function Checkout() {
       setGstStatus(g);
       if (g?.gstin) setAddr((a) => ({ ...a, gstin: g.gstin }));
     }).catch(() => {});
+    api.get("/settings").then((r) => setBankDetails(r.data?.bankDetails || {})).catch(() => {});
   }, [fetch]);
 
   const verifyGst = async () => {
@@ -196,6 +198,43 @@ export default function Checkout() {
                 </label>
               ))}
             </div>
+
+            {/* Bank details shown when COD is selected */}
+            {method === "cod" && bankDetails && (bankDetails.bankName || bankDetails.accountNumber) && (
+              <div className="mt-4 border border-dashed border-[color:var(--brand-primary)] rounded-lg p-4 bg-red-50/50" data-testid="cod-bank-details">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded bg-[color:var(--brand-primary)] text-white flex items-center justify-center text-sm font-black">₹</div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">Bank Transfer Details</div>
+                    <div className="text-[11px] text-slate-500">Transfer the order amount to the account below</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                  {bankDetails.bankName && (
+                    <><span className="text-slate-500">Bank Name</span><span className="font-semibold text-slate-800 sku">{bankDetails.bankName}</span></>
+                  )}
+                  {bankDetails.accountHolder && (
+                    <><span className="text-slate-500">Account Holder</span><span className="font-semibold text-slate-800">{bankDetails.accountHolder}</span></>
+                  )}
+                  {bankDetails.accountNumber && (
+                    <><span className="text-slate-500">Account Number</span><span className="font-semibold text-slate-800 sku">{bankDetails.accountNumber}</span></>
+                  )}
+                  {bankDetails.ifsc && (
+                    <><span className="text-slate-500">IFSC Code</span><span className="font-semibold text-slate-800 sku">{bankDetails.ifsc}</span></>
+                  )}
+                  {bankDetails.branch && (
+                    <><span className="text-slate-500">Branch</span><span className="font-semibold text-slate-800">{bankDetails.branch}</span></>
+                  )}
+                  {bankDetails.upiId && (
+                    <><span className="text-slate-500">UPI ID</span><span className="font-semibold text-slate-800 sku">{bankDetails.upiId}</span></>
+                  )}
+                </div>
+                <div className="mt-3 text-[11px] text-slate-500 flex items-start gap-1.5">
+                  <WarningCircle size={13} className="text-amber-500 shrink-0 mt-0.5" weight="fill" />
+                  <span>Please complete the bank transfer after placing the order. Your order will be processed once payment is confirmed.</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="card-flat p-5 h-fit space-y-3">

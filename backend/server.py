@@ -475,7 +475,7 @@ async def _cart_summary(user_id: str):
         })
         subtotal += line
         tax_total += line_tax
-    shipping = 0 if subtotal >= 10000 else (99 if subtotal > 0 else 0)
+    shipping = 0 if subtotal >= 10000 else (9 if subtotal > 0 else 0)
     return {
         "items": items, "subtotal": subtotal, "tax": tax_total,
         "shipping": shipping, "total": subtotal + tax_total + shipping,

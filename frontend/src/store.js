@@ -45,7 +45,7 @@ export const useSettings = create((set) => ({
       if (t.primary) root.style.setProperty("--brand-primary", t.primary);
       if (t.secondary) root.style.setProperty("--brand-secondary", t.secondary);
       if (t.accent) root.style.setProperty("--brand-accent", t.accent);
-      if (t.background) root.style.setProperty("--brand-bg", t.background);
+      if (t.background) { root.style.setProperty("--brand-bg", t.background); } else { root.style.setProperty("--brand-bg", "#f1f3f6"); }
       if (t.surface) root.style.setProperty("--brand-surface", t.surface);
       if (t.border) root.style.setProperty("--brand-border", t.border);
       if (t.radius) root.style.setProperty("--brand-radius", t.radius);

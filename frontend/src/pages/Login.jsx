@@ -24,8 +24,9 @@ export default function Login() {
   return (
     <div className="container-max py-12 max-w-md">
       <div className="card-flat p-8">
-        <h1 className="text-3xl font-black mb-1">Welcome back</h1>
-        <p className="text-sm text-slate-500 mb-6">Sign in to your B2B account</p>
+        
+        
+        <p className="text-sm text-slate-500 mb-6">Sign in</p>
         <form onSubmit={submit} className="space-y-4">
           <label className="block">
             <span className="text-xs text-slate-500">Email</span>

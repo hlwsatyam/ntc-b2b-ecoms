@@ -108,21 +108,77 @@ export default function AdminSettings() {
           ))}
         </div>
 
-        {/* Hero Banner */}
+        {/* Hero Carousel Banners */}
         <div className="card-flat p-5 md:col-span-2">
-          <div className="font-display font-bold text-lg mb-3">Hero Banner</div>
-          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
-            <ImageUpload
-              value={s.homepage?.heroBanners?.[0]?.image}
-              onChange={(v) => set("homepage.heroBanners", [{ ...(s.homepage?.heroBanners?.[0] || {}), image: v }])}
-              label="Hero image" testid="upload-hero" aspect="banner"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              {[["title","Title",2],["subtitle","Subtitle",2],["cta","CTA button label",1],["link","Link (URL or /path)",1]].map(([k, l, col]) => (
-                <label key={k} className={`text-xs ${col === 2 ? "col-span-2" : ""}`}><span className="text-slate-500">{l}</span>
-                  <input value={s.homepage?.heroBanners?.[0]?.[k] || ""} onChange={(e) => set("homepage.heroBanners", [{ ...(s.homepage.heroBanners?.[0] || {}), [k]: e.target.value }])} className="mt-1 w-full border rounded px-3 py-2" data-testid={`hero-${k}`} /></label>
-              ))}
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="font-display font-bold text-lg">Hero Carousel Banners</div>
+              <div className="text-xs text-slate-500 mt-1">Upload multiple slides — they auto-rotate on the homepage. Recommended aspect ratio: 21:8.</div>
             </div>
+            <button
+              onClick={() => {
+                const list = s.homepage?.heroBanners || [];
+                set("homepage.heroBanners", [...list, { id: `b${Date.now()}`, title: "", subtitle: "", image: "", cta: "Shop now", link: "/products", tag: "" }]);
+              }}
+              className="btn-primary text-xs"
+              data-testid="add-hero-slide"
+            >+ Add Slide</button>
+          </div>
+          <div className="space-y-4">
+            {(s.homepage?.heroBanners || []).map((slide, idx, list) => {
+              const move = (dir) => {
+                const next = [...list];
+                const j = idx + dir;
+                if (j < 0 || j >= next.length) return;
+                [next[idx], next[j]] = [next[j], next[idx]];
+                set("homepage.heroBanners", next);
+              };
+              const patch = (k, v) => {
+                const next = [...list];
+                next[idx] = { ...next[idx], [k]: v };
+                set("homepage.heroBanners", next);
+              };
+              const remove = () => {
+                if (!window.confirm("Delete this slide?")) return;
+                set("homepage.heroBanners", list.filter((_, i) => i !== idx));
+              };
+              return (
+                <div key={slide.id || idx} className="border border-[color:var(--brand-border)] rounded-lg p-4 bg-slate-50" data-testid={`hero-slide-${idx}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-500">Slide {idx + 1}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => move(-1)} disabled={idx === 0} className="text-[11px] px-2 py-1 border rounded hover:bg-slate-200 disabled:opacity-30" data-testid={`slide-up-${idx}`}>↑ Up</button>
+                      <button onClick={() => move(1)} disabled={idx === list.length - 1} className="text-[11px] px-2 py-1 border rounded hover:bg-slate-200 disabled:opacity-30" data-testid={`slide-down-${idx}`}>↓ Down</button>
+                      <button onClick={remove} className="text-[11px] text-red-500 px-2 py-1 border border-red-200 rounded hover:bg-red-50" data-testid={`slide-del-${idx}`}>Delete</button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4">
+                    <ImageUpload
+                      value={slide.image}
+                      onChange={(v) => patch("image", v)}
+                      label="Banner image" testid={`hero-img-${idx}`} aspect="banner"
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="text-xs"><span className="text-slate-500">Tag (badge)</span>
+                        <input value={slide.tag || ""} onChange={(e) => patch("tag", e.target.value)} placeholder="e.g. Best Deals, New" className="mt-1 w-full border rounded px-3 py-2" data-testid={`hero-tag-${idx}`} /></label>
+                      <label className="text-xs"><span className="text-slate-500">CTA button</span>
+                        <input value={slide.cta || ""} onChange={(e) => patch("cta", e.target.value)} placeholder="Shop now" className="mt-1 w-full border rounded px-3 py-2" data-testid={`hero-cta-${idx}`} /></label>
+                      <label className="col-span-2 text-xs"><span className="text-slate-500">Title</span>
+                        <input value={slide.title || ""} onChange={(e) => patch("title", e.target.value)} className="mt-1 w-full border rounded px-3 py-2" data-testid={`hero-title-${idx}`} /></label>
+                      <label className="col-span-2 text-xs"><span className="text-slate-500">Subtitle</span>
+                        <input value={slide.subtitle || ""} onChange={(e) => patch("subtitle", e.target.value)} className="mt-1 w-full border rounded px-3 py-2" data-testid={`hero-subtitle-${idx}`} /></label>
+                      <label className="col-span-2 text-xs"><span className="text-slate-500">Link (URL or /path)</span>
+                        <input value={slide.link || ""} onChange={(e) => patch("link", e.target.value)} placeholder="/products" className="mt-1 w-full border rounded px-3 py-2 sku" data-testid={`hero-link-${idx}`} /></label>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {(s.homepage?.heroBanners || []).length === 0 && (
+              <div className="text-center text-sm text-slate-500 py-8 border-2 border-dashed border-slate-200 rounded-lg">
+                No slides yet. Click "+ Add Slide" to create your first carousel banner.
+              </div>
+            )}
           </div>
         </div>
 
@@ -342,6 +398,31 @@ export default function AdminSettings() {
               <input type="password" value={s.integrations?.razorpay?.keySecret || ""} onChange={(e) => set("integrations.razorpay.keySecret", e.target.value)} placeholder="****************" className="mt-1 w-full border rounded px-3 py-2 sku text-xs" data-testid="rzp-key-secret" /></label>
             <label className="text-xs"><span className="text-slate-500">Webhook Secret</span>
               <input value={s.integrations?.razorpay?.webhookSecret || ""} onChange={(e) => set("integrations.razorpay.webhookSecret", e.target.value)} className="mt-1 w-full border rounded px-3 py-2 sku text-xs" data-testid="rzp-webhook-secret" /></label>
+          </div>
+        </div>
+
+        {/* BANK DETAILS FOR COD */}
+        <div className="card-flat p-5 md:col-span-2">
+          <div className="font-display font-bold text-lg mb-1">Bank Details (COD / NEFT / RTGS)</div>
+          <p className="text-xs text-slate-500 mb-3">These details will be shown on the checkout page when a buyer selects Cash on Delivery, so they can transfer payment directly via NEFT/RTGS/UPI.</p>
+          <div className="grid md:grid-cols-3 gap-3">
+            {["bankName", "accountHolder", "accountNumber", "ifsc", "branch", "upiId"].map((k) => {
+              const labels = { bankName: "Bank Name", accountHolder: "Account Holder Name", accountNumber: "Account Number", ifsc: "IFSC Code", branch: "Branch", upiId: "UPI ID (optional)" };
+              const placeholders = { bankName: "HDFC Bank", accountHolder: "TradeHub Pvt Ltd", accountNumber: "50100012345678", ifsc: "HDFC0001234", branch: "Andheri West, Mumbai", upiId: "tradehub@upi" };
+              const col2 = k === "accountNumber" || k === "ifsc";
+              return (
+                <label key={k} className={`text-xs ${col2 ? "md:col-span-1" : ""}`}>
+                  <span className="text-slate-500">{labels[k]}</span>
+                  <input
+                    value={s.bankDetails?.[k] || ""}
+                    onChange={(e) => set(`bankDetails.${k}`, e.target.value)}
+                    placeholder={placeholders[k]}
+                    className="mt-1 w-full border rounded px-3 py-2 text-xs sku"
+                    data-testid={`bank-${k}`}
+                  />
+                </label>
+              );
+            })}
           </div>
         </div>
 

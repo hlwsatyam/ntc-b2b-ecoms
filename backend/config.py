@@ -54,7 +54,7 @@ DEFAULT_SETTINGS = {
         "primary": "#E11D48",
         "secondary": "#0F172A",
         "accent": "#F59E0B",
-        "background": "#F5F5F7",
+        "background": "#f1f3f6",
         "surface": "#FFFFFF",
         "border": "#E5E7EB",
         "radius": "0.375rem",
@@ -89,6 +89,14 @@ DEFAULT_SETTINGS = {
         "wishlist": True,
         "compare": True,
         "flashSale": True,
+    },
+    "bankDetails": {
+        "bankName": "",
+        "accountHolder": "",
+        "accountNumber": "",
+        "ifsc": "",
+        "branch": "",
+        "upiId": "",
     },
     "policies": {
         "terms": {
@@ -125,7 +133,26 @@ DEFAULT_SETTINGS = {
                 "image": "https://images.pexels.com/photos/36398150/pexels-photo-36398150.jpeg",
                 "cta": "Shop deals",
                 "link": "/products",
-            }
+                "tag": "Best Deals",
+            },
+            {
+                "id": "b2",
+                "title": "Industrial supplies at wholesale rates",
+                "subtitle": "Power tools, safety gear, MRO — direct from manufacturers",
+                "image": "https://images.pexels.com/photos/18631424/pexels-photo-18631424.jpeg",
+                "cta": "Explore catalog",
+                "link": "/products?category=c-industrial",
+                "tag": "New arrivals",
+            },
+            {
+                "id": "b3",
+                "title": "Electronics & components wholesale",
+                "subtitle": "LED, cables, components — tier pricing on bulk orders",
+                "image": "https://images.pexels.com/photos/3560564/pexels-photo-3560564.jpeg",
+                "cta": "View products",
+                "link": "/products?category=c-electronics",
+                "tag": "Popular",
+            },
         ],
         "promoCards": [
             {"id": "pc1", "image": "https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=400", "title": "Test & Measure",   "link": "/products?category=c-electronics"},

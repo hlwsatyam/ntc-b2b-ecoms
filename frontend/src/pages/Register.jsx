@@ -23,7 +23,7 @@ export default function Register() {
   return (
     <div className="container-max py-12 max-w-lg">
       <div className="card-flat p-8">
-        <h1 className="text-3xl font-black mb-1">Create your B2B account</h1>
+        <h1 className="text-3xl font-black mb-1">Create your account</h1>
         <p className="text-sm text-slate-500 mb-6">Trade smarter with verified vendors and MOQ pricing.</p>
         <form onSubmit={submit} className="grid grid-cols-2 gap-3">
           {[
